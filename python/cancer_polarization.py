@@ -1,7 +1,6 @@
 import numpy as np
 #import numba
 
-
 def get_particles(lattice):
     """
     return the number of particles, regarless of
@@ -60,8 +59,6 @@ def get_neighbours(k,Lx,Ly,iopen = 1):
     e4     e1 --x
       e5 e6
 
-    
-
     """
     ky,kx = np.divmod(k,Lx)
     ieven = ky%2
@@ -110,8 +107,7 @@ def boundary_conditions(Lx,Ly,lattice):
     lattice[-Lx:] = 0
     return None
 
-
-def update(k,Lx,Ly,lattice,rng,prob,param):
+def update_fixedtime(k,Lx,Ly,lattice,rng,prob,param):
     """
     update the k-th site
 
@@ -157,7 +153,8 @@ def update(k,Lx,Ly,lattice,rng,prob,param):
     target = select_next(k,idirection,Lx,Ly)
     # check if target is not in the border, otherwise
     # just return
-    if not (target < L): return -target,prob
+    if not (target < L): return -target,prob # NOTE:: it should not be necessary
+                                             # NOTE:: because border sites should not be selected
     shared=[lattice[j] for j in get_neighbours_shared(k,target,Lx,Ly,iopen=1)]
     #
     # try to move to target
@@ -176,78 +173,137 @@ def update(k,Lx,Ly,lattice,rng,prob,param):
         lattice[k]      = 0
         return 1+idirection,prob
     return 0,prob
-#==================================================
-def run_sample(Lx=5,Ly=10,steps=100,params=[1e0,0e0,0e0,0e0]):
+
+def update_variabletime(k,Lx,Ly,lattice,rates):
     """
-    returns the lattice and density data after 
-    steps steps have elapsed
+    updates the k-th site using the Gillespie algorithm
+    and returns the resulting time increase
+
+    OBS: the routine assumes the k-th site is occupied 
+         by a cell, regardless of polarization
+    OBS: rates refers to the single cell transition
+         rates
+    """
+    iflag       = 0
+    delta_time  = 0
+    total_rate  = 0
+    icoord = 6 # hexagon
+    if (lattice[k] < 2) & (rates['polarization'] > 0e0):
+        #
+        # cell has no polarization
+        #
+        total_rate = rates['polarization']
+        delta_time = -(1e0/total_rate)*np.log(np.random.rand())
+        iflag = 100+np.random.choice(range(2,icoord),1) 
+        return iflag,delta_time        
+    #
+    # cell has polarization
+    #
+    idirection = lattice[k] - 2 # NOTE: assuming lattice[k] > 1
+    next_site  = select_next(k,idirection,Lx,Ly) 
+    next_avail = 1 - min(lattice[next_site],1)        
+    has_shared = min(1, sum(
+        [lattice[j] for j in get_neighbours_shared(k,next_site,Lx,Ly,iopen=1)]))
+    #
+    # calculate the total transition rate
+    #
+    prob_dist = np.array([rates['gapjunction_positive']*next_avail*has_shared,
+                          rates['gapjunction_negative']*next_avail*(1-has_shared),
+                          rates['depolarization']],dtype=np.float64)
+    total_rate  = np.sum(prob_dist) 
+    #
+    # generate a random number from the exponential distribution
+    #
+    if total_rate > 0:
+        prob_dist   = prob_dist / total_rate
+        #
+        # select a transition according to the partial weights
+        # of the rates
+        #
+        transition = int(np.random.choice(range(len(prob_dist)),
+                                      p=prob_dist))
+        #
+        # use a dictionary to replace the switch case, given
+        # lattice[k] and lattice[next_site]
+        #
+        # lattice[k],lattice[next_site] = \
+        #     {0: lambda x,y: (0,x),
+        #      1: lambda x,y: (0,x),
+        #      2: lambda x,y: (1,y)}[transition](lattice[k],lattice[next_site])
+
+        depol = int(transition > 1)
+        lattice[next_site]= lattice[k]*(1-depol) + depol
+        lattice[k]        = depol
+        
+        delta_time = -(1e0/total_rate)*np.log(np.random.rand())
+        iflag = transition+200
+        #print(iflag,type(iflag))
+    return iflag,delta_time
+
+#==================================================
+def sample_fixedtime(Lx=5,Ly=10,steps=100,rates={}):
+    """
+    returns a sample lattice after steps timesteps have
+    elapsed, given the transition rates rates, via 
+    gillespie algorithm. Note that the time interval between
+    timesteps are *not* equal.
     """
     lattice = np.zeros(Lx*Ly,dtype=int)
     boundary_conditions(Lx,Ly,lattice)
         
-    data_density = np.zeros(steps,dtype=np.float64)
-
+    data_density = np.zeros((steps,2),dtype=np.float64)
+    dt     = 1e0/(Lx*Ly)
+    params = [rates['gapjunction_positive']*dt,
+              rates['gapjunction_negative']*dt,
+              rates['depolarization'      ]*dt,
+              rates['polarization'        ]*dt]
+    
     for step in range(steps):
         prob = 0e0
         rng  = np.random.rand()
 
-        data_density[step]=get_particles(lattice) 
+        data_density[step,:]=(step*dt,get_particles(lattice)) 
         #
         # list instead of a generator! slow down...
         #
-        order = np.arange(Lx*Ly)
+        order = np.arange((Lx-1)*Ly)
         np.random.shuffle(order)
         for k in order:
-            iflag,prob = update(k,Lx,Ly,lattice,rng,prob,params)
+            iflag,prob = update_fixedtime(k,Lx,Ly,lattice,rng,prob,params)
             if iflag>0: break
         boundary_conditions(Lx,Ly,lattice)
     return lattice,data_density
-#==================================================
-#==================================================
-def pretty_printing(Lx,Ly,lattice):
+
+def sample_variabletime(Lx=5,Ly=10,steps=100,rates={}):
     """
-    print the lattice for display in regular terminal
+    returns a sample lattice after steps timesteps have
+    elapsed, given the transition rates rates, via 
+    gillespie algorithm. Note that the time interval between
+    timesteps are *not* equal.
     """
-    for ky in range(Ly):
-        print(" "*(ky%2),*(lattice[i +ky*Lx] for i in range(Lx)))
-    return None
-#==================================================
-def get_args():
-    import argparse
-    parser = argparse.ArgumentParser(description='''
-    Stochastic simulation of cell dynamics
+    lattice = np.zeros(Lx*Ly,dtype=int)
+    boundary_conditions(Lx,Ly,lattice)        
+    data_density = np.zeros((steps,2),dtype=np.float64)
+    current = 0
+    for step in range(steps):
+        data_density[step,:]=(current,get_particles(lattice)) 
+        k = np.random.choice( [j for j in range((Lx-1)*Ly) if lattice[j] > 0]  )
+        iflag,dt = update_variabletime(k,Lx,Ly,lattice,rates)
+        boundary_conditions(Lx,Ly,lattice)
+        current += dt
+    return lattice,data_density
 
-    a) gap junction model
-    b) cell polarization
 
-    ''')
-    parser.add_argument('-x',metavar='Lx',nargs=1,type=int,
-                default=5,help='lattice size in x-direction (default 5)')
-    parser.add_argument('-y',metavar='Ly',nargs=1,type=int,
-                default=10,help='lattice size in x-direction (default 10)')
-    parser.add_argument('--samples',metavar='num samples',nargs=1,type=int,
-                default=1,help='number of sample runs (default 1)')
-    parser.add_argument('--steps',metavar='num steps',nargs=1,type=int,
-                default=10,help='number of time steps (default 10)')
-    parser.add_argument('--contact',metavar='rate',nargs=1,type=float,
-                default=0.9,
-                help='single cell | transition rate | gap junction (default 0.9)')
-    parser.add_argument('--depolarization',metavar='rate',
-                nargs=1,type=float, default=0.01,
-                help='single cell | transition rate | depolarization (default 0.01)')
-    parser.add_argument('--polarization',metavar='rate',
-                nargs=1,type=float, default=0.01,
-                help='single cell | transition rate | polarization (default 0.9)')
-    args = parser.parse_args()
-    return args
-#==================================================
-#==================================================
-#==================================================
 
+
+
+
+
+
+#==================================================
 if __name__ == "__main__":
     
     print("::Starting unitary tests::")
-
     def test_neighbours():
         """
         test all neighbours from a hexagonal lattice
@@ -279,7 +335,7 @@ if __name__ == "__main__":
         #    print ("... site %s :: %s" % (entry[0],entry[1]))
         return all([x[1] for x in v])
 #--------------------------------------
-    def test_update_1():
+    def test_update_fixedtime_1():
         istatus = 0
 
         Lx=5
@@ -291,10 +347,10 @@ if __name__ == "__main__":
         lattice[0] = istatus
         prob = 0e0
         rng  = 1e-12
-        iflag,prob = update(0,Lx,Ly,lattice,rng,prob,params)
+        iflag,prob = update_fixedtime(0,Lx,Ly,lattice,rng,prob,params)
         return all( [iflag == 0, prob < 1e-10, lattice[0]==0 ])
 #--------------------------------------
-    def test_update_2():
+    def test_update_fixedtime_2():
         istatus = 1
 
         Lx=5
@@ -307,10 +363,10 @@ if __name__ == "__main__":
         lattice[0] = istatus
         prob = 0e0
         rng  = 1e-12
-        iflag,prob = update(0,Lx,Ly,lattice,rng,prob,params)
+        iflag,prob = update_fixedtime(0,Lx,Ly,lattice,rng,prob,params)
         return all( [iflag != 0, prob <= (1e0/L)+1e-10,(lattice[0] !=(istatus|0))])
 #--------------------------------------
-    def test_update_3():        
+    def test_update_fixedtime_3():        
         iflag = False
         Lx=5
         Ly=10
@@ -323,11 +379,11 @@ if __name__ == "__main__":
         boundary_conditions(Lx,Ly,lattice)
         prob = 0e0
         rng  = 0e0 # np.random.rand()
-        iflag,prob = update(0,Lx,Ly,lattice,rng,prob,params)
+        iflag,prob = update_fixedtime(0,Lx,Ly,lattice,rng,prob,params)
 
         return all((iflag==2,lattice[5]==3,lattice[0]==0,prob<1e-6+params[0]))
 #--------------------------------------
-    def test_update_4():        
+    def test_update_fixedtime_4():        
         iflag = False
         Lx=5
         Ly=10
@@ -341,10 +397,10 @@ if __name__ == "__main__":
         prob = 0e0
         rng  = 0e0 # np.random.rand()
         lattice[5]=1
-        iflag,prob = update(0,Lx,Ly,lattice,rng,prob,params)
+        iflag,prob = update_fixedtime(0,Lx,Ly,lattice,rng,prob,params)
         return all((iflag==0,lattice[5]==1,lattice[0]==3,prob<1e-6+params[0]))
 #--------------------------------------
-    def test_update_5():        
+    def test_update_fixedtime_5():        
         iflag = False
         Lx=5
         Ly=10
@@ -358,10 +414,10 @@ if __name__ == "__main__":
         prob = 0e0
         rng  = 0e0 # np.random.rand()
         lattice[11]=2
-        iflag,prob = update(11,Lx,Ly,lattice,rng,prob,params)
+        iflag,prob = update_fixedtime(11,Lx,Ly,lattice,rng,prob,params)
         return all((iflag==1,lattice[11]==0,lattice[12]==2,prob<1e-6+params[0]))
 #--------------------------------------
-    def test_update_6():        
+    def test_update_fixedtime_6():        
         iflag = False
         Lx=5
         Ly=10
@@ -374,13 +430,13 @@ if __name__ == "__main__":
         boundary_conditions(Lx,Ly,lattice)
         prob = 0e0
         rng  = 0e0 # np.random.rand()
-        iflag,prob = update(0,Lx,Ly,lattice,rng,prob,params)
+        iflag,prob = update_fixedtime(0,Lx,Ly,lattice,rng,prob,params)
         return all((iflag==100,lattice[0]==1,prob<1e-6+params[2]))
 #--------------------------------------
     print(">>> Test neighbours :: %s" % (test_neighbours()))
-    print(">>> Test update 1   :: %s" % (test_update_1() ))
-    print(">>> Test update 2   :: %s" % (test_update_2() ))
-    print(">>> Test update 3   :: %s" % (test_update_3() ))
-    print(">>> Test update 4   :: %s" % (test_update_4() ))
-    print(">>> Test update 5   :: %s" % (test_update_5() ))
-    print(">>> Test update 6   :: %s" % (test_update_6() ))
+    print(">>> Test update 1   :: %s" % (test_update_fixedtime_1() ))
+    print(">>> Test update 2   :: %s" % (test_update_fixedtime_2() ))
+    print(">>> Test update 3   :: %s" % (test_update_fixedtime_3() ))
+    print(">>> Test update 4   :: %s" % (test_update_fixedtime_4() ))
+    print(">>> Test update 5   :: %s" % (test_update_fixedtime_5() ))
+    print(">>> Test update 6   :: %s" % (test_update_fixedtime_6() ))
