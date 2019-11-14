@@ -167,9 +167,17 @@ contains
     ! It also returns the ishared neighbours between
     ! k and k+e(idirection)
     !================================================
-    integer,intent(out)::inext,ishared(2)
-    integer            ::ineigh(0:icoordination)
-    call get_neighbours(k,Lx,Ly,ineigh)    
+    integer,intent(in)   ::k,idirection,Lx,Ly
+    integer,intent(inout)::inext,ishared(2)
+    integer              ::ineigh(0:icoordination)
+    call get_neighbours(k,Lx,Ly,ineigh)
+
+    if (idirection > 7) then
+       print *,'ERROR',idirection,k,'>>',int(ineigh,1)
+       print *,idirection
+    end if
+
+    
     inext = ineigh(idirection)    
     !
     ! idirection can be 0,1,...,icoordination    
@@ -196,15 +204,16 @@ contains
     ! set empty sites with ky = 1 to direction e2 
     ! and removes cells with ky=Ly-1
     !================================================
-    integer,intent(inout)::lattice(0: (Lx*Ly-1) )
-    integer              ::itmp(0:Lx-1)
-    lattice(0:Lx-1) = ipolarized_e2
+    integer,intent(in)   ::Lx,Ly
+    integer,intent(inout)::lattice(0:(Lx*Ly-1))
+    integer              ::itmp(0:Lx-1) 
+    lattice(0:(Lx-1)) = ipolarized_e2
     idx = 2*Lx - 1
     itmp = min(1,lattice(Lx:idx))
     ! if empty, add a cell in e2 direction
     lattice(Lx:idx) = lattice(Lx:idx)*itmp+(1-itmp)*ipolarized_e2
     ! last Lx vanishes
-    lattice(Lx*(Ly-1):)= iempty
+    lattice(Lx*(Ly-1):Lx*Ly-1)= iempty
   end subroutine boundary_conditions
   !================================================
   subroutine update_fixedtime(k,Lx,Ly,lattice,params,rng,prob,iflag)
@@ -219,17 +228,17 @@ contains
     ! lattice(i,j) = 0, no direction
     !              = (1,2,3,4,5,6) otherwise
     !================================================
+    integer,intent(in)   ::Lx,Ly,k
     integer,intent(inout)::lattice(0:(Lx*Ly-1)),iflag
     real*8 ,intent(in)   ::params(7),rng
     real*8 ,intent(inout)::prob
     integer              ::ishared(2)    
     iflag=0
     ! get the target cell current status
-    icurrent = lattice(k)
+    icurrent = lattice(k)    
     ! determine whether the cell exists or not (binary)
     istatus  = min(1,icurrent)
 
-    print *,'debug 1::',int(istatus,1)
     
     if (istatus.eq.iempty) return ! nothing to do here
     L = Lx*Ly    
@@ -247,7 +256,7 @@ contains
        !
        ! pick a new direction
        !
-       inew = ichoice([ipolarized_e1:ipolarized_e6])
+       inew = ichoice([(iz,iz=ipolarized_e1,ipolarized_e6)])
        lattice(k) = inew*itmp + (1-itmp)
        iflag = inonpolarized
        return
@@ -280,10 +289,7 @@ contains
     p = params(igapjunction)*dt
     prob = prob +istatus*(  istatus_contact)*p
     prob = prob +istatus*(1-istatus_contact)*(1-p)
-    icell_move = icheck(prob,rng)
-    
-    print *,"debug 4::",icell_move,inext,ishared
-
+    icell_move = icheck(prob,rng)    
     lattice(inext) = lattice(k)*icell_move+lattice(inext)*(1-icell_move)
     lattice(k)     = lattice(k)*(1-icell_move)
     iflag = icell_move*igapjunction
@@ -291,13 +297,12 @@ contains
     
   end subroutine update_fixedtime
   !================================================
-  subroutine sample_fixedtime(Lx,Ly,isteps,params)
-    real*8 ,intent(in)::params(7)
-    integer::lattice(0:(Lx*Ly-1))
-    integer::iorder(Lx*Ly)
-    ! Lx = int(params(1))
-    ! Ly = int(params(2))
-    ! isteps = int(params(3))
+  subroutine sample_fixedtime(Lx,Ly,lattice,params)
+    real*8 ,intent(in)   ::params(7)
+    integer,intent(in)   ::Lx,Ly
+    integer,intent(inout)::lattice(0:(Lx*Ly-1))
+    integer,allocatable  ::iorder(:)        
+    isteps = int(params(3))
     call boundary_conditions(Lx,Ly,lattice)
     do istep = 0,isteps-1
        !
@@ -305,21 +310,21 @@ contains
        !
 
        !
-       ! update sites
+       ! update one time interval
        !
        call random_number(rng)
        prob  = 0d0
        iflag = 0
-       
        isite = 0       
-       call melanger(Lx,Ly,lattice,iorder,isize)
-       
+       allocate(iorder,source=melanger_sansreplacement(Lx,Ly,lattice))
+       isize=size(iorder)
        do while ((isite.LT.isize).and.(iflag.lt.1))
           isite = isite+1
-          k = iorder(isite)
+          k     = iorder(isite)          
           call update_fixedtime(k,Lx,Ly,lattice,params,rng,prob,iflag)
-       end do
+       end do       
        call boundary_conditions(Lx,Ly,lattice)
+       deallocate(iorder)
     end do
     
   end subroutine sample_fixedtime
@@ -329,29 +334,33 @@ contains
     real*8 ,allocatable::rng(:)
     integer,allocatable::itmp(:)
 
-    itmp = [(k, k=0,Lx*Ly-1)]
+    itmp = [(k, k=Lx,Lx*(Ly-1)-1)]
+    !
+    ! NOTE:: skipping the source and the sink in
+    !        the line above
+    !
     itmp = pack(itmp,lattice(itmp)>0)
-    allocate(rng(size(itmp)))
-    call random_number(rng)
-
     L = size(itmp)
+    allocate(rng(L))
+    call random_number(rng)
+    rng = rng*L
     do i=1,L
-       iq = int(rng(i)*L)
+       iq = int(rng(i)) + 1 ! index shift
        ia = itmp(iq)
        itmp(iq) = itmp(i)
        itmp(i)  = ia
     end do
   end function melanger_sansreplacement 
   !================================================
-  subroutine melanger(Lx,Ly,lattice,iorder,isize)
-    integer,intent(in)   ::Lx,Ly,lattice(0:Lx*Ly-1)
-    integer,intent(inout)::isize,iorder(Lx*Ly)
-    integer,allocatable  ::itmp(:)
-    iorder = 0
-    itmp   = melanger_sansreplacement(Lx,Ly,lattice)
-    isize  = size(itmp)
-    iorder(1:isize) = itmp
-  end subroutine melanger
+  ! subroutine melanger(Lx,Ly,lattice,iorder,isize)
+  !   integer,intent(in)   ::Lx,Ly,lattice(0:Lx*Ly-1)
+  !   integer,intent(inout)::isize,iorder(Lx*Ly)
+  !   integer,allocatable  ::itmp(:)
+  !   iorder = 0
+  !   itmp   = melanger_sansreplacement(Lx,Ly,lattice)
+  !   isize  = size(itmp)
+  !   iorder(1:isize) = itmp
+  ! end subroutine melanger
   !================================================
   subroutine pretty_printing(Lx,Ly,lattice)
     integer,intent(in)::Lx,Ly,lattice(0:(Lx*Ly-1))
