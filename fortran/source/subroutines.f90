@@ -261,7 +261,7 @@ contains
     
     !
     ! try to depolarize it
-    !
+    !    
     prob   = prob+params(idepolarization)*dt
     idepol = icheck(prob,rng)
     if (idepol.eq.1) then
@@ -286,7 +286,8 @@ contains
     icell_move = icheck(prob,rng)    
     lattice(inext) = lattice(k)*icell_move+lattice(inext)*(1-icell_move)
     lattice(k)     = lattice(k)*(1-icell_move)
-    iflag = icell_move*igapjunction    
+    iflag = icell_move*igapjunction
+
     return    
   end subroutine update_fixedtime
   !================================================

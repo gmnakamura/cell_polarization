@@ -5,6 +5,7 @@ program main
   real*8       ::params(7)
   character*128::ifilename
   integer,allocatable::lattice(:)
+  integer::ineigh(0:6)
   
   call read_args(params,ifilename)
   Lx = int(params(1))
@@ -16,11 +17,11 @@ program main
   allocate(lattice(0:L-1))
   lattice = 0
   !end of initialization
-  do isample=1,isamples     
-     call sample_fixedtime(Lx,Ly,lattice,params)
-     print *,'----'
-     call pretty_printing(Lx,Ly,lattice)
-  end do
+  ! do isample=1,isamples     
+  !    call sample_fixedtime(Lx,Ly,lattice,params)
+  !    print *,'----'
+  !    call pretty_printing(Lx,Ly,lattice)
+  ! end do
 
   print *,'*************'
   lattice = 0
@@ -29,8 +30,18 @@ program main
   prob = 0
   rng =1d-8
   call update_fixedtime(Lx,Lx,Ly,lattice,params,rng,prob,iflag)
+  call pretty_printing(Lx,Ly,lattice)
+  print *,'---------'
+  call get_neighbours(Lx,Lx,Ly,ineigh)
+  print *,int(ineigh,1)
+  call get_neighbours(2*Lx,Lx,Ly,ineigh)
+  print *,int(ineigh,1)
+  prob = 0
   call update_fixedtime(2*Lx,Lx,Ly,lattice,params,rng,prob,iflag)
   call pretty_printing(Lx,Ly,lattice)
+
+  print *,'<<',lattice(18)
+  
 
   ! open(9, file=trim(ifilename)//"_statistics.dat") 
   ! do istep=0,isteps-1
