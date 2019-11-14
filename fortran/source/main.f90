@@ -12,14 +12,25 @@ program main
   isteps   = int(params(3))
   isamples = int(params(4))
   L = Lx*Ly
+  !initializaion
   allocate(lattice(0:L-1))
-  do isample=1,isamples          
+  lattice = 0
+  !end of initialization
+  do isample=1,isamples     
      call sample_fixedtime(Lx,Ly,lattice,params)
      print *,'----'
      call pretty_printing(Lx,Ly,lattice)
   end do
-  
 
+  print *,'*************'
+  lattice = 0
+  call boundary_conditions(Lx,Ly,lattice)
+  iflag = 0
+  prob = 0
+  rng =1d-8
+  call update_fixedtime(Lx,Lx,Ly,lattice,params,rng,prob,iflag)
+  call update_fixedtime(2*Lx,Lx,Ly,lattice,params,rng,prob,iflag)
+  call pretty_printing(Lx,Ly,lattice)
 
   ! open(9, file=trim(ifilename)//"_statistics.dat") 
   ! do istep=0,isteps-1

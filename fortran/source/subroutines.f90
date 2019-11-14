@@ -118,6 +118,7 @@ contains
   end subroutine read_args
   !================================================
   subroutine get_neighbours(k,Lx,Ly,ineigh)
+    integer,intent(in) ::k,Lx,Ly
     integer,intent(out)::ineigh(0:icoordination)
     !================================================
     ! returns a vector with index of neighbours of 
@@ -170,14 +171,7 @@ contains
     integer,intent(in)   ::k,idirection,Lx,Ly
     integer,intent(inout)::inext,ishared(2)
     integer              ::ineigh(0:icoordination)
-    call get_neighbours(k,Lx,Ly,ineigh)
-
-    if (idirection > 7) then
-       print *,'ERROR',idirection,k,'>>',int(ineigh,1)
-       print *,idirection
-    end if
-
-    
+    call get_neighbours(k,Lx,Ly,ineigh)    
     inext = ineigh(idirection)    
     !
     ! idirection can be 0,1,...,icoordination    
@@ -277,7 +271,7 @@ contains
     end if
     !
     ! cell is polarized and failed to depolarized
-    !      
+    !    
     call select(k,icurrent,Lx,Ly,inext,ishared)
     !
     ! check whether the target site is empty
@@ -292,9 +286,8 @@ contains
     icell_move = icheck(prob,rng)    
     lattice(inext) = lattice(k)*icell_move+lattice(inext)*(1-icell_move)
     lattice(k)     = lattice(k)*(1-icell_move)
-    iflag = icell_move*igapjunction
-    return
-    
+    iflag = icell_move*igapjunction    
+    return    
   end subroutine update_fixedtime
   !================================================
   subroutine sample_fixedtime(Lx,Ly,lattice,params)
@@ -303,6 +296,8 @@ contains
     integer,intent(inout)::lattice(0:(Lx*Ly-1))
     integer,allocatable  ::iorder(:)        
     isteps = int(params(3))
+    !initialization
+    lattice = 0
     call boundary_conditions(Lx,Ly,lattice)
     do istep = 0,isteps-1
        !

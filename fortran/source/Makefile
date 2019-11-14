@@ -1,5 +1,6 @@
 F90=gfortran-mp-7 #ifort
-FFLAGS=-O2 -fopenmp -fbounds-check
+#FFLAGS=-O2 -fopenmp -fbounds-check
+FFLAGS= -fbounds-check -g -finit-local-zero 
 
 OBJ=subroutines.o 
 SOURCE=subroutines.f90
