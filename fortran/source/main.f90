@@ -5,6 +5,7 @@ program main
   real*8       ::params(7)
   character*128::ifilename
   integer,allocatable::lattice(:)
+  real*8 ,allocatable::data(:),datum(:)
   integer::ineigh(0:6)
   
   call read_args(params,ifilename)
@@ -16,38 +17,23 @@ program main
   !initializaion
   allocate(lattice(0:L-1))
   lattice = 0
-  !end of initialization
-  ! do isample=1,isamples     
-  !    call sample_fixedtime(Lx,Ly,lattice,params)
-  !    print *,'----'
-  !    call pretty_printing(Lx,Ly,lattice)
-  ! end do
-
-  print *,'*************'
-  lattice = 0
-  call boundary_conditions(Lx,Ly,lattice)
-  iflag = 0
-  prob = 0
-  rng =1d-8
-  call update_fixedtime(Lx,Lx,Ly,lattice,params,rng,prob,iflag)
-  call pretty_printing(Lx,Ly,lattice)
-  print *,'---------'
-  call get_neighbours(Lx,Lx,Ly,ineigh)
-  print *,int(ineigh,1)
-  call get_neighbours(2*Lx,Lx,Ly,ineigh)
-  print *,int(ineigh,1)
-  prob = 0
-  call update_fixedtime(2*Lx,Lx,Ly,lattice,params,rng,prob,iflag)
-  call pretty_printing(Lx,Ly,lattice)
-
-  print *,'<<',lattice(18)
+  allocate(data(0:isteps-1),datum(0:isteps-1))
+  data = 0d0
+  datum = 0d0
+  !!end of initialization
+  do isample=1,isamples     
+     call sample_fixedtime(Lx,Ly,lattice,params,datum)
+     data = data + datum/isamples
+  end do
   
+  call pretty_printing(Lx,Ly,lattice)
 
-  ! open(9, file=trim(ifilename)//"_statistics.dat") 
-  ! do istep=0,isteps-1
-  !    write(9 ,*) istep,stats(:,istep)    
-  ! end do
-  ! close(9)
+  
+  open(9, file=trim(ifilename)//"_density.dat") 
+  do istep=0,isteps-1
+     write(9 ,*) istep,data(istep)    
+  end do
+  close(9)
 
   ! open(10, file=trim(ifilename)//"_average.dat")
   ! open(11, file=trim(ifilename)//"_density.dat")

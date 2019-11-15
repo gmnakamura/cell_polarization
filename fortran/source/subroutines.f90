@@ -28,16 +28,19 @@ module subroutines
   
 contains
   function ichoice(ivector)
+    !================================================
+    ! returns a single sample chosen from ivector
+    !================================================
     integer::ichoice
     integer,intent(in)::ivector(:)
     real*8 ::rng
     call random_number(rng)
     ichoice = ivector(int(rng*size(ivector))+1)
   end function ichoice
-  function icheck(x,y)
-    !
+  function icheck(x,y)    
+    !================================================
     ! returns 1 if y < x, 0 otherwise 
-    !
+    !================================================
     integer::icheck
     icheck = (int(sign(1d0,x-y))+1)/2
   end function icheck
@@ -96,7 +99,6 @@ contains
     end do
     ifilename = trim(ifilename) !//'.dat'
 
-
     i = time()
     call ctime(i,arg)
     print *,"************************"
@@ -118,8 +120,6 @@ contains
   end subroutine read_args
   !================================================
   subroutine get_neighbours(k,Lx,Ly,ineigh)
-    integer,intent(in) ::k,Lx,Ly
-    integer,intent(out)::ineigh(0:icoordination)
     !================================================
     ! returns a vector with index of neighbours of 
     ! site k, in the cylindrical geometry with hexagonal
@@ -134,6 +134,8 @@ contains
     !  10  11  12  13  14
     !15  16  17  18  19
     !
+    integer,intent(in) ::k,Lx,Ly
+    integer,intent(out)::ineigh(0:icoordination)
     ineigh(0) = k ! index-0 points to the site itself
     
     kx = mod(k,Lx)
@@ -183,12 +185,16 @@ contains
     ! e4 - > e5, e3
     ! e5 - > e6, e4
     ! e6 - > e1, e5
+
+    ! shift by 1 
     m = idirection - 1
-    m1= mod(m+1+icoordination,icoordination) + 1
-    m2= mod(m-1+icoordination,icoordination) + 1
-    ! ishared = 0 if idirection = 0
+    ! max added just to avoid negative index if
+    ! idirection = 0
+    m1= max(mod(m+1+icoordination,icoordination) + 1,0)
+    m2= max(mod(m-1+icoordination,icoordination) + 1,0)    
+    ! ishared = k if idirection = 0
     ishared(1) = ineigh(m1)*min(idirection,1)
-    ishared(2) = ineigh(m2)*min(idirection,1)
+    ishared(2) = ineigh(m2)*min(idirection,1)    
   end subroutine select
   !================================================
   subroutine boundary_conditions(Lx,Ly,lattice)
@@ -212,15 +218,17 @@ contains
   !================================================
   subroutine update_fixedtime(k,Lx,Ly,lattice,params,rng,prob,iflag)
     !================================================
-    ! updates the status of site k using stochastic
-    ! rules.
+    ! updates the status of lattice(k).
     !
-    ! k       :: site
-    ! lattice :: lattice with all cell configurations
-    ! params  :: params(1) = p , params(2) = change dir
+    ! lattice(k) = 0, empty site
+    !            = (1,2,3,4,5,6,7) otherwise
     !
-    ! lattice(i,j) = 0, no direction
-    !              = (1,2,3,4,5,6) otherwise
+    ! rng is a constant input, common to all tests
+    ! until a configurational change is detected or
+    ! exhausted (without changes)
+    !
+    ! prob is the likelihood of a configurational change
+    ! it increases with each call of the subroutine
     !================================================
     integer,intent(in)   ::Lx,Ly,k
     integer,intent(inout)::lattice(0:(Lx*Ly-1)),iflag
@@ -271,30 +279,33 @@ contains
     end if
     !
     ! cell is polarized and failed to depolarized
-    !    
-    call select(k,icurrent,Lx,Ly,inext,ishared)
+    !
+    ! NOTE: idirection = icurrent - 1
+    call select(k,icurrent-1,Lx,Ly,inext,ishared)
     !
     ! check whether the target site is empty
     !
     istatus = istatus * (1-min(1,lattice(inext)))
     istatus_contact = min(sum(lattice(ishared)),1)    
-    !if         istatus_contact = 0, use 1-p
-    !otherwise, istatus_contact = 1, use p
-    p = params(igapjunction)*dt
+    !if         istatus_contact = 1, use p
+    !otherwise, istatus_contact = 0, use q
+    p =      params(igapjunction) *dt
+    q = (1d0-params(igapjunction))*dt
     prob = prob +istatus*(  istatus_contact)*p
-    prob = prob +istatus*(1-istatus_contact)*(1-p)
+    prob = prob +istatus*(1-istatus_contact)*q
+
     icell_move = icheck(prob,rng)    
     lattice(inext) = lattice(k)*icell_move+lattice(inext)*(1-icell_move)
     lattice(k)     = lattice(k)*(1-icell_move)
-    iflag = icell_move*igapjunction
-
+    iflag = igapjunction*icell_move
     return    
   end subroutine update_fixedtime
   !================================================
-  subroutine sample_fixedtime(Lx,Ly,lattice,params)
+  subroutine sample_fixedtime(Lx,Ly,lattice,params,data)
     real*8 ,intent(in)   ::params(7)
     integer,intent(in)   ::Lx,Ly
     integer,intent(inout)::lattice(0:(Lx*Ly-1))
+    real*8 ,intent(out)  ::data(:)
     integer,allocatable  ::iorder(:)        
     isteps = int(params(3))
     !initialization
@@ -302,9 +313,9 @@ contains
     call boundary_conditions(Lx,Ly,lattice)
     do istep = 0,isteps-1
        !
-       ! measurements
+       ! measurements NOTE: deferred datatype starts as 1-index
        !
-
+       call measurements(Lx,Ly,lattice,data(istep+1:istep+1))
        !
        ! update one time interval
        !
@@ -314,11 +325,12 @@ contains
        isite = 0       
        allocate(iorder,source=melanger_sansreplacement(Lx,Ly,lattice))
        isize=size(iorder)
+       
        do while ((isite.LT.isize).and.(iflag.lt.1))
           isite = isite+1
           k     = iorder(isite)          
           call update_fixedtime(k,Lx,Ly,lattice,params,rng,prob,iflag)
-       end do       
+       end do
        call boundary_conditions(Lx,Ly,lattice)
        deallocate(iorder)
     end do
@@ -346,25 +358,33 @@ contains
        itmp(iq) = itmp(i)
        itmp(i)  = ia
     end do
-  end function melanger_sansreplacement 
+  end function melanger_sansreplacement
+!================================================
+  subroutine measurements(Lx,Ly,lattice,data)
+    !================================================
+    ! returns vector data extracted from lattice
+    !================================================
+    integer,intent(in) ::Lx,Ly,lattice(0:Lx*Ly-1)
+    real*8 ,intent(out)::data(:)
+
+    ! total number of particles in the lattice
+    data(1) = get_number_particles(lattice)
+    
+  end subroutine measurements
   !================================================
-  ! subroutine melanger(Lx,Ly,lattice,iorder,isize)
-  !   integer,intent(in)   ::Lx,Ly,lattice(0:Lx*Ly-1)
-  !   integer,intent(inout)::isize,iorder(Lx*Ly)
-  !   integer,allocatable  ::itmp(:)
-  !   iorder = 0
-  !   itmp   = melanger_sansreplacement(Lx,Ly,lattice)
-  !   isize  = size(itmp)
-  !   iorder(1:isize) = itmp
-  ! end subroutine melanger
-  !================================================
+  function get_number_particles(lattice) result(x)
+    integer,intent(in)::lattice(:)
+    integer::x
+    x = sum(min(lattice,1))
+  end function get_number_particles
+  !================================================  
   subroutine pretty_printing(Lx,Ly,lattice)
     integer,intent(in)::Lx,Ly,lattice(0:(Lx*Ly-1))
     do ky =0,Ly-1
        if (mod(ky,2).eq.0) then
-          print *,"   ",(int( lattice(k+Lx*ky) ,2),k=0,Lx-1)
-       else
           print *,(int( lattice(k+Lx*ky) ,2),k=0,Lx-1)
+       else
+          print *,"   ",(int( lattice(k+Lx*ky) ,2),k=0,Lx-1)
        end if
     end do
   end subroutine pretty_printing
