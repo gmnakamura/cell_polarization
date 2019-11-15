@@ -4,34 +4,45 @@ program main
   implicit real*8(a-h,o-z)
   real*8       ::params(7)
   character*128::ifilename
-  integer,allocatable::lattice(:)
   real*8 ,allocatable::data(:),datum(:)
-  integer::ineigh(0:6)
   
-  call read_args(params,ifilename)
+  call read_args(params,ifilename,idata_skip)
   Lx = int(params(1))
   Ly = int(params(2))
   isteps   = int(params(3))
   isamples = int(params(4))
   L = Lx*Ly
-  !initializaion
-  allocate(lattice(0:L-1))
-  lattice = 0
-  allocate(data(0:isteps-1),datum(0:isteps-1))
+  !
+  ! Data storage can grow really fast with
+  ! lattice size as the time interval shrinks
+  ! with L. Therefore, it is convenient to
+  ! only store data every other idata_skip steps
+  !
+  is_zero = min(1,idata_skip)
+  idata_skip = (1-is_zero)+is_zero*(int(L/max(1,idata_skip))-1)
+
+
+  
+  !idata_skip = int(L/4) ! set it to 1 to storage all time steps
+  !
+  !
+  !data initializaion
+  m = int(isteps/idata_skip) - 1 
+  allocate(data(0:m),datum(0:m))
   data = 0d0
   datum = 0d0
   !!end of initialization
   do isample=1,isamples     
-     call sample_fixedtime(Lx,Ly,lattice,params,datum)
+     call sample_fixedtime(Lx,Ly,params,idata_skip,datum)
      data = data + datum/isamples
   end do
-  
-  call pretty_printing(Lx,Ly,lattice)
 
   
-  open(9, file=trim(ifilename)//"_density.dat") 
-  do istep=0,isteps-1
-     write(9 ,*) istep,data(istep)    
+  open(9, file=trim(ifilename)//"_density.dat")
+  islices = int(isteps/idata_skip)
+  do islice=0,islices - 1
+     ! istep = islice*idata_skip
+     write(9 ,*) islice*idata_skip ,data(islice)    
   end do
   close(9)
 

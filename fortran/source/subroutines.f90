@@ -25,7 +25,6 @@ module subroutines
   integer,parameter::igapjunction    = 5
   integer,parameter::idepolarization = 6
   integer,parameter::ipolarization   = 7
-  
 contains
   function ichoice(ivector)
     !================================================
@@ -44,19 +43,22 @@ contains
     integer::icheck
     icheck = (int(sign(1d0,x-y))+1)/2
   end function icheck
-  subroutine read_args(fargs,ifilename)
+  subroutine read_args(fargs,ifilename,idata_skip_factor)
     !================================================
     ! collect arguments from command line
     !================================================
     character(len=32)::arg
-    real*8          ,intent(out)::fargs(7)    
+    real*8          ,intent(out)::fargs(7)
+    integer         ,intent(out)::idata_skip_factor
     character(len=*),intent(out)::ifilename
 
     ! default values
     ! N = 10 , steps = 100 , samples =100 ,
     ! gapjunction = 0.5, depolarization = 0.05 , polarization = 0.5
     fargs = (/ 1d1, 1d1, 1d2 , 1d2 , 5d-1 , 5d-2, 5d-2/)
-
+    ! default data skip
+    idata_skip_factor = 4
+    
     ifilename =  "data"    
     
     ntotal = command_argument_count() 
@@ -91,14 +93,23 @@ contains
           call get_command_argument(i+1,arg)
           read(arg,*) fargs(7)
           ifilename = trim(ifilename)//'_polarization'//trim(arg)
+       case ('--skip')          
+          call get_command_argument(i+1,arg)
+          read(arg,*) idata_skip_factor          
+          ! if 0, then use all data
+          idata_skip_factor = max(0,idata_skip_factor)
+          write(arg,'(I1)') int(idata_skip_factor,1)
+          ifilename = trim(ifilename)//'_dataskip'//trim(arg)
        case('-h','--help')
           print *,'example usage'
-          print *,'      main -x 10 -y 10 --samples 100 --steps 100 --gap-junction 0.5 --polarization 0.05 --depolarization 0.1'
+          print *,'main -x 10 -y 10 --samples 100 --steps 100 --gap-junction 0.5 --polarization 0.05 --depolarization 0.1 --skip 4'
+          print *,' '
+          print *,'OBS: --skip 0 or any negative number forces collection of data at each time interval'
           call exit(0)
        end select
     end do
     ifilename = trim(ifilename) !//'.dat'
-
+    
     i = time()
     call ctime(i,arg)
     print *,"************************"
@@ -306,38 +317,51 @@ contains
     return    
   end subroutine update_fixedtime
   !================================================
-  subroutine sample_fixedtime(Lx,Ly,lattice,params,data)
+  subroutine sample_fixedtime(Lx,Ly,params,idata_skip,data)
     real*8 ,intent(in)   ::params(7)
-    integer,intent(in)   ::Lx,Ly
-    integer,intent(inout)::lattice(0:(Lx*Ly-1))
+    integer,intent(in)   ::Lx,Ly,idata_skip
     real*8 ,intent(out)  ::data(:)
+    integer              ::lattice(0:(Lx*Ly-1))
     integer,allocatable  ::iorder(:)        
     isteps = int(params(3))
     !initialization
     lattice = 0
     call boundary_conditions(Lx,Ly,lattice)
-    do istep = 0,isteps-1
-       !
-       ! measurements NOTE: deferred datatype starts as 1-index
-       !
-       call measurements(Lx,Ly,lattice,data(istep+1:istep+1))
-       !
-       ! update one time interval
-       !
+    !
+    ! measurements NOTE: deferred datatype starts as 1-index
+    !
+    idx = 1
+    call measurements(Lx,Ly,lattice,data(idx:idx)) ! entry data
+    do istep = 1,isteps              
        call random_number(rng)
        prob  = 0d0
        iflag = 0
-       isite = 0       
+       isite = 0
+       !
+       ! update sides according to order iorder
+       ! iorder : shuffled index of non-empty sites
+       !
        allocate(iorder,source=melanger_sansreplacement(Lx,Ly,lattice))
-       isize=size(iorder)
-       
+       isize=size(iorder)       
        do while ((isite.LT.isize).and.(iflag.lt.1))
           isite = isite+1
           k     = iorder(isite)          
           call update_fixedtime(k,Lx,Ly,lattice,params,rng,prob,iflag)
        end do
-       call boundary_conditions(Lx,Ly,lattice)
+       call boundary_conditions(Lx,Ly,lattice)       
        deallocate(iorder)
+       !
+       ! only stores data every other idata_skip
+       !
+       ! if (mod(istep,idata_skip).eq.0) then
+       !    idx = idx+1
+       !    call measurements(Lx,Ly,lattice,data(idx:idx)) ! entry data
+       ! end if
+       !
+       ! alternatively, avoid the if statemente when measurements are fast
+       !
+       idx = 2 + int(istep/idata_skip)
+       call measurements(Lx,Ly,lattice,data(idx:idx))
     end do
     
   end subroutine sample_fixedtime
