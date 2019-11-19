@@ -329,7 +329,7 @@ contains
     ! measurements NOTE: deferred datatype starts as 1-index
     !
     idx = 1
-    call measurements(Lx,Ly,lattice,data(idx,1:idata_size)) ! entry data
+    call measurements(Lx,Ly,lattice,data(idx,:)) ! entry data
     do istep = 1,isteps              
        call random_number(rng)
        prob  = 0d0
@@ -343,7 +343,7 @@ contains
        isize=size(iorder)       
        do while ((isite.LT.isize).and.(iflag.lt.1))
           isite = isite+1
-          k     = iorder(isite)          
+          k     = iorder(isite)
           call update_fixedtime(k,Lx,Ly,lattice,params,rng,prob,iflag)
        end do
 
@@ -363,9 +363,9 @@ contains
        ! alternatively, avoid the if statemente when measurements are fast
        !
        idx = 2 + int(istep/idata_skip)
-       call measurements(Lx,Ly,lattice,data(idx,1:idata_size))
-    end do
-    
+       call measurements(Lx,Ly,lattice,data(idx,:))
+       print *,data(idx,idata_size) - count(lattice>0)
+    end do    
   end subroutine sample_fixedtime
   !================================================
   function melanger_sansreplacement(Lx,Ly,lattice) result(itmp)
@@ -404,10 +404,10 @@ contains
     ! do idir = 1,min(icoordination+1,idata_size)
     !    data(idir) = get_number_particles(idir,lattice)
     ! end do
-
-    data(1) = count(lattice.eq.0)
-    data(2) = count(lattice > 1)
-    data(3) = count(lattice > 0)
+    
+    data(1) = count(lattice.eq.1)
+    data(2) = count(lattice.gt.1)
+    data(3) = data(1)+data(2)
   end subroutine measurements
   !================================================
   function get_number_particles(idir,lattice) result(x)

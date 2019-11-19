@@ -20,22 +20,23 @@ program main
   !
   is_zero = min(1,idata_skip)
   idata_skip = (1-is_zero)+is_zero*(int(L/max(1,idata_skip))-1)
+
   
   !idata_skip = int(L/4) ! set it to 1 to storage all time steps
   !
   !
-  !data initializaion
-  m = int(isteps/idata_skip) - 1 
+  !data initialization
+  m = int(isteps/idata_skip) +1 !- 1 
   allocate(data(0:m,idata_size),datum(0:m,idata_size))
   data = 0d0
   datum = 0d0
   !!end of initialization
 
-  !$OMP PARALLEL DO private(datum)
-  do isample=1,isamples     
+  !$OMP PARALLEL DO private(datum,lattice) 
+  do isample=1,isamples
      call sample_fixedtime(Lx,Ly,params,idata_skip,datum)
      !$OMP CRITICAL
-     data = data + datum/isamples
+     data = data + datum*1d0/isamples
      !$OMP END CRITICAL
   end do
   !$OMP END PARALLEL DO
