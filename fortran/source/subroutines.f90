@@ -25,6 +25,9 @@ module subroutines
   integer,parameter::igapjunction    = 5
   integer,parameter::idepolarization = 6
   integer,parameter::ipolarization   = 7
+
+  ! number of colums data should hold per time step
+  integer,parameter    ::idata_size = 3
 contains
   function ichoice(ivector)
     !================================================
@@ -109,11 +112,7 @@ contains
        end select
     end do
     ifilename = trim(ifilename) !//'.dat'
-    
-    i = time()
-    call ctime(i,arg)
-    print *,"************************"
-    print *,trim(arg)
+       
     print *,"************************"
     print *," "
     print *,"Starting parameters for hexagonal lattice :: "
@@ -320,18 +319,17 @@ contains
   subroutine sample_fixedtime(Lx,Ly,params,idata_skip,data)
     real*8 ,intent(in)   ::params(7)
     integer,intent(in)   ::Lx,Ly,idata_skip
-    real*8 ,intent(out)  ::data(:)
+    real*8 ,intent(out)  ::data(:,:)
     integer              ::lattice(0:(Lx*Ly-1))
     integer,allocatable  ::iorder(:)        
     isteps = int(params(3))
-    !initialization
     lattice = 0
     call boundary_conditions(Lx,Ly,lattice)
     !
     ! measurements NOTE: deferred datatype starts as 1-index
     !
     idx = 1
-    call measurements(Lx,Ly,lattice,data(idx:idx)) ! entry data
+    call measurements(Lx,Ly,lattice,data(idx,1:idata_size)) ! entry data
     do istep = 1,isteps              
        call random_number(rng)
        prob  = 0d0
@@ -348,7 +346,11 @@ contains
           k     = iorder(isite)          
           call update_fixedtime(k,Lx,Ly,lattice,params,rng,prob,iflag)
        end do
-       call boundary_conditions(Lx,Ly,lattice)       
+
+       ! NOTE:: sink and source COMMENTED BELOW       
+       !
+       !       call boundary_conditions(Lx,Ly,lattice)
+       !
        deallocate(iorder)
        !
        ! only stores data every other idata_skip
@@ -361,7 +363,7 @@ contains
        ! alternatively, avoid the if statemente when measurements are fast
        !
        idx = 2 + int(istep/idata_skip)
-       call measurements(Lx,Ly,lattice,data(idx:idx))
+       call measurements(Lx,Ly,lattice,data(idx,1:idata_size))
     end do
     
   end subroutine sample_fixedtime
@@ -371,7 +373,9 @@ contains
     real*8 ,allocatable::rng(:)
     integer,allocatable::itmp(:)
 
-    itmp = [(k, k=Lx,Lx*(Ly-1)-1)]
+    itmp = [(k, k=0,Lx*(Ly)-1)]
+    
+    !    itmp = [(k, k=Lx,Lx*(Ly-1)-1)]
     !
     ! NOTE:: skipping the source and the sink in
     !        the line above
@@ -394,18 +398,29 @@ contains
     ! returns vector data extracted from lattice
     !================================================
     integer,intent(in) ::Lx,Ly,lattice(0:Lx*Ly-1)
-    real*8 ,intent(out)::data(:)
+    real*8 ,intent(out)::data(idata_size)
 
-    ! total number of particles in the lattice
-    data(1) = get_number_particles(lattice)
-    
+    ! ! number of particles in status idir
+    ! do idir = 1,min(icoordination+1,idata_size)
+    !    data(idir) = get_number_particles(idir,lattice)
+    ! end do
+
+    data(1) = count(lattice.eq.0)
+    data(2) = count(lattice > 1)
+    data(3) = count(lattice > 0)
   end subroutine measurements
   !================================================
-  function get_number_particles(lattice) result(x)
-    integer,intent(in)::lattice(:)
+  function get_number_particles(idir,lattice) result(x)
+    integer,intent(in)::lattice(:),idir
     integer::x
-    x = sum(min(lattice,1))
+    x = count(lattice.eq.idir)
   end function get_number_particles
+  !================================================
+  ! function get_number_particles(lattice) result(x)
+  !   integer,intent(in)::lattice(:)
+  !   integer::x
+  !   x = sum(min(lattice,1))
+  ! end function get_number_particles
   !================================================  
   subroutine pretty_printing(Lx,Ly,lattice)
     integer,intent(in)::Lx,Ly,lattice(0:(Lx*Ly-1))
