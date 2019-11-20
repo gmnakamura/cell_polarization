@@ -26,8 +26,6 @@ module subroutines
   integer,parameter::idepolarization = 6
   integer,parameter::ipolarization   = 7
 
-  ! number of colums data should hold per time step
-  integer,parameter    ::idata_size = 3
 contains
   function ichoice(ivector)
     !================================================
@@ -323,7 +321,10 @@ contains
     integer,intent(in)   ::Lx,Ly,idata_skip
     real*8 ,intent(out)  ::data(:,:)
     integer              ::lattice(0:(Lx*Ly-1))
-    integer,allocatable  ::iorder(:)        
+    integer,allocatable  ::iorder(:)
+
+!    idata_size = 3+Lx*Ly
+    
     isteps = int(params(3))
     lattice = 0
     call boundary_conditions(Lx,Ly,lattice)
@@ -375,8 +376,7 @@ contains
     real*8 ,allocatable::rng(:)
     integer,allocatable::itmp(:)
 
-    itmp = [(k, k=0,Lx*(Ly)-1)]
-    
+    itmp = [(k, k=0,Lx*(Ly)-1)]    
     !    itmp = [(k, k=Lx,Lx*(Ly-1)-1)]
     !
     ! NOTE:: skipping the source and the sink in
@@ -400,7 +400,7 @@ contains
     ! returns vector data extracted from lattice
     !================================================
     integer,intent(in) ::Lx,Ly,lattice(0:Lx*Ly-1)
-    real*8 ,intent(out)::data(idata_size)
+    real*8 ,intent(out)::data(:)
 
     ! ! number of particles in status idir
     ! do idir = 1,min(icoordination+1,idata_size)
@@ -410,6 +410,11 @@ contains
     data(1) = count(lattice.eq.1)
     data(2) = count(lattice.gt.1)
     data(3) = data(1)+data(2)
+
+    kk = 4
+    do k=0,Lx*Ly-1
+       data(kk+k) = lattice(k)
+    end do
   end subroutine measurements
   !================================================
   function get_number_particles(idir,lattice) result(x)
