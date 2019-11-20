@@ -86,22 +86,23 @@ contains
           ifilename = trim(ifilename)//'_samples'//trim(arg)
        case ('--gap-junction','-g')          
           call get_command_argument(i+1,arg)
-          read(arg,*) fargs(5)
+          read(arg,*) fargs(igapjunction)
           ifilename = trim(ifilename)//'_gapjunction'//trim(arg)
        case ('--depolarization','-d')          
           call get_command_argument(i+1,arg)
-          read(arg,*) fargs(6)
+          read(arg,*) fargs(idepolarization)
           ifilename = trim(ifilename)//'_depolarization'//trim(arg)
        case ('--polarization','-p')          
           call get_command_argument(i+1,arg)
-          read(arg,*) fargs(7)
+          read(arg,*) fargs(ipolarization)
           ifilename = trim(ifilename)//'_polarization'//trim(arg)
        case ('--skip')          
           call get_command_argument(i+1,arg)
           read(arg,*) idata_skip_factor          
           ! if 0, then use all data
           idata_skip_factor = max(0,idata_skip_factor)
-          write(arg,'(I1)') int(idata_skip_factor,1)
+          if (idata_skip_factor.EQ.0) arg='0'
+!          write(arg,'(I1)') int(idata_skip_factor,1)
           ifilename = trim(ifilename)//'_dataskip'//trim(arg)
        case('-h','--help')
           print *,'example usage'
@@ -112,7 +113,12 @@ contains
        end select
     end do
     ifilename = trim(ifilename) !//'.dat'
-       
+
+
+    !NOTE:
+    ! polarization is divided by the coordination number
+    fargs(ipolarization)=fargs(ipolarization)/icoordination
+    
     print *,"************************"
     print *," "
     print *,"Starting parameters for hexagonal lattice :: "
@@ -121,9 +127,9 @@ contains
     print *,"isteps    = ",int(fargs(3))
     print *,"isamples  = ",int(fargs(4))
     print *,""
-    print *,"gap-junction   rate = ",fargs(5)
-    print *,"depolarization rate = ",fargs(6)
-    print *,"polarization   rate = ",fargs(7)
+    print *,"gap-junction   rate = ",fargs(igapjunction)
+    print *,"depolarization rate = ",fargs(idepolarization)
+    print *,"polarization   rate = ",fargs(ipolarization)
     print *," "
     print *,"filename = ",ifilename
     print *,"************************"
@@ -249,9 +255,7 @@ contains
     ! get the target cell current status
     icurrent = lattice(k)    
     ! determine whether the cell exists or not (binary)
-    istatus  = min(1,icurrent)
-
-    
+    istatus  = min(1,icurrent)    
     if (istatus.eq.iempty) return ! nothing to do here
     L = Lx*Ly    
     ! params hold single cell transition rates
@@ -267,12 +271,10 @@ contains
     ! try to polarize the cell if lattice(k) = inonpolarized
     !
     if (lattice(k).eq.inonpolarized) then
-       prob = prob + params(ipolarization)*dt
+       prob = prob + icoordination*params(ipolarization)*dt
        ! check if the test succeeded
        itmp = icheck(prob,rng) ! itmp = 1 if rng < prob
-       !
        ! pick a new direction
-       !
        inew = ichoice([(iz,iz=ipolarized_e1,ipolarized_e6)])
        lattice(k) = inew*itmp + (1-itmp)
        iflag = inonpolarized
@@ -364,8 +366,8 @@ contains
        !
        idx = 2 + int(istep/idata_skip)
        call measurements(Lx,Ly,lattice,data(idx,:))
-       print *,data(idx,idata_size) - count(lattice>0)
-    end do    
+    end do
+
   end subroutine sample_fixedtime
   !================================================
   function melanger_sansreplacement(Lx,Ly,lattice) result(itmp)
