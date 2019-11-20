@@ -4,7 +4,7 @@ module subroutines
   ! coordination number of the hexanonal lattice
   !
   integer,parameter::icoordination = 6
-
+ 
   ! sketch of the lattice enumeration
   !
   !  00  01  02  03  04  
@@ -26,6 +26,9 @@ module subroutines
   integer,parameter::idepolarization = 6
   integer,parameter::ipolarization   = 7
 
+
+  ! parameters related to measurements
+  integer,parameter::idata_size_base = 3
 contains
   function ichoice(ivector)
     !================================================
@@ -412,9 +415,11 @@ contains
     data(3) = data(1)+data(2)
 
     kk = 4
-    do k=0,Lx*Ly-1
-       data(kk+k) = lattice(k)
-    end do
+    ! do k=0,Lx*Ly-1
+    !    data(kk+k) = lattice(k)
+    ! end do
+
+    data(kk:(kk+Lx*Ly-1)) = min(lattice,1)
   end subroutine measurements
   !================================================
   function get_number_particles(idir,lattice) result(x)

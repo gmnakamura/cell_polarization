@@ -28,7 +28,7 @@ program main
   !data initialization
   m = int(isteps/idata_skip) +1 !- 1
 
-  idata_size_base = 3
+!  idata_size_base = 3
   idata_size = idata_size_base + L
   allocate(data(0:m,idata_size),datum(0:m,idata_size))
   data = 0d0
