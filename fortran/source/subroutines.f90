@@ -424,13 +424,33 @@ contains
     data(kk:(kk+Lx*Ly-1)) = min(lattice,1)
   end subroutine measurements
   !================================================
-  function entropy(Lx,Ly,ivector)
+  function entropy(Lx,Ly,lattice)
     ! returns the entropy associated with finding a
     ! contiguous block with size isize in the vector
     ! lattice
-    integer,intent(in)::Lx,Ly,ivector(0:Lx*Ly-1)
+    integer,intent(in)::Lx,Ly,lattice(0:Lx*Ly-1)
+    integer,parameter ::_isize = 10
+    integer::icount(_isize)
+    integer::ivector(0:Lx*Ly-1)
+    real*8 ::entropy
+
+
+    L = Lx*Ly
+    ! super lazy ....
+    ivector = min(1,lattice)
     
-    
+    ! single
+    icount(1) = sum(ivector)
+    do k = 1,_isize -1
+       ivector(0:L-1-k) = ivector(0:L-1-k)*min(1,lattice(k:L-1))
+       do j = 1,k
+          ivector(L-1-k+j) = ivector(L-1-k+j)*min(1,lattice(j-1))
+       end do             
+       icount(k+1) = sum(ivector)
+    end do     
+    total = 1d0/sum(icount)
+
+    entropy = -sum( (total * icount)*log( total * icount  ) )              
   end function entropy
   !================================================
   function get_number_particles(idir,lattice) result(x)
