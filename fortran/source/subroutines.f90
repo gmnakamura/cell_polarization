@@ -412,15 +412,26 @@ contains
     
     data(1) = count(lattice.eq.1)
     data(2) = count(lattice.gt.1)
-    data(3) = data(1)+data(2)
+!    data(3) = data(1)+data(2)
 
-    kk = 4
+    data(3) = entropy(Lx,Ly,lattice)
+    
+    kk = 5
     ! do k=0,Lx*Ly-1
     !    data(kk+k) = lattice(k)
     ! end do
 
     data(kk:(kk+Lx*Ly-1)) = min(lattice,1)
   end subroutine measurements
+  !================================================
+  function entropy(Lx,Ly,ivector)
+    ! returns the entropy associated with finding a
+    ! contiguous block with size isize in the vector
+    ! lattice
+    integer,intent(in)::Lx,Ly,ivector(0:Lx*Ly-1)
+    
+    
+  end function entropy
   !================================================
   function get_number_particles(idir,lattice) result(x)
     integer,intent(in)::lattice(:),idir
