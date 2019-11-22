@@ -225,11 +225,11 @@ contains
     integer,intent(inout)::lattice(0:(Lx*Ly-1))
     integer              ::itmp(0:Lx-1) 
     lattice(0:(Lx-1)) = ipolarized_e2
-    idx = 2*Lx - 1
-    itmp = min(1,lattice(Lx:idx))
-    ! if empty, add a cell in e2 direction
-    lattice(Lx:idx) = lattice(Lx:idx)*itmp+(1-itmp)*ipolarized_e2
-    ! last Lx vanishes
+    ! idx = 2*Lx - 1
+    ! itmp = min(1,lattice(Lx:idx))
+    ! ! if empty, add a cell in e2 direction
+    ! lattice(Lx:idx) = lattice(Lx:idx)*itmp+(1-itmp)*ipolarized_e2
+    ! ! last Lx vanishes
     lattice(Lx*(Ly-1):Lx*Ly-1)= iempty
   end subroutine boundary_conditions
   !================================================
