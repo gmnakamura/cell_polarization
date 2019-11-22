@@ -29,7 +29,7 @@ program main
   m = int(isteps/idata_skip) +1 !- 1
 
 !  idata_size_base = 3
-  idata_size = idata_size_base + L
+  idata_size = idata_size_base !+ L
   allocate(data(0:m,idata_size),datum(0:m,idata_size))
   data = 0d0
   datum = 0d0
@@ -51,12 +51,12 @@ program main
   end do
   close(9)
 
-  open(10, file=trim(ifilename)//"_lattice.dat")
-  islices = int(isteps/idata_skip)
-  do islice=0,islices - 1
-     write(10 ,*) islice*idata_skip,data(islice,idata_size_base+1:idata_size)    
-  end do
-  close(10)
+  ! open(10, file=trim(ifilename)//"_lattice.dat")
+  ! islices = int(isteps/idata_skip)
+  ! do islice=0,islices - 1
+  !    write(10 ,*) islice*idata_skip,data(islice,idata_size_base+1:idata_size)    
+  ! end do
+  ! close(10)
 
 end program main
 

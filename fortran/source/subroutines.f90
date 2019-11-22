@@ -28,7 +28,7 @@ module subroutines
 
 
   ! parameters related to measurements
-  integer,parameter::idata_size_base = 3
+  integer,parameter::idata_size_base = 6
 contains
   function ichoice(ivector)
     !================================================
@@ -361,15 +361,15 @@ contains
        !
        ! only stores data every other idata_skip
        !
-       ! if (mod(istep,idata_skip).eq.0) then
-       !    idx = idx+1
-       !    call measurements(Lx,Ly,lattice,data(idx:idx)) ! entry data
-       ! end if
+       if (mod(istep,idata_skip).eq.0) then
+          idx = idx+1
+          call measurements(Lx,Ly,lattice,data(idx,:)) ! entry data
+       end if
        !
        ! alternatively, avoid the if statemente when measurements are fast
        !
-       idx = 2 + int(istep/idata_skip)
-       call measurements(Lx,Ly,lattice,data(idx,:))
+       ! idx = 2 + int(istep/idata_skip)
+       ! call measurements(Lx,Ly,lattice,data(idx,:))
     end do
 
   end subroutine sample_fixedtime
@@ -412,16 +412,20 @@ contains
     
     data(1) = count(lattice.eq.1)
     data(2) = count(lattice.gt.1)
-!    data(3) = data(1)+data(2)
+    !    data(3) = data(1)+data(2)
 
-    data(3) = entropy(Lx,Ly,lattice)
+    data(3) = sum(min(lattice(0:2*Lx-1),1)) 
+    data(4) = data(3)**2d0
+    data(5) = sum(min(lattice(0:1),1)) 
+    data(6) = data(5)**2d0
+
     
-    kk = 5
-    ! do k=0,Lx*Ly-1
-    !    data(kk+k) = lattice(k)
-    ! end do
 
-    data(kk:(kk+Lx*Ly-1)) = min(lattice,1)
+!    data(3) = entropy(Lx,Ly,lattice)
+
+    
+    ! kk = idata_size_base+1
+    ! data(kk:(kk+Lx*Ly-1)) = min(lattice,1)
   end subroutine measurements
   !================================================
   function entropy(Lx,Ly,lattice)
@@ -429,28 +433,7 @@ contains
     ! contiguous block with size isize in the vector
     ! lattice
     integer,intent(in)::Lx,Ly,lattice(0:Lx*Ly-1)
-    integer,parameter ::_isize = 10
-    integer::icount(_isize)
-    integer::ivector(0:Lx*Ly-1)
-    real*8 ::entropy
-
-
-    L = Lx*Ly
-    ! super lazy ....
-    ivector = min(1,lattice)
-    
-    ! single
-    icount(1) = sum(ivector)
-    do k = 1,_isize -1
-       ivector(0:L-1-k) = ivector(0:L-1-k)*min(1,lattice(k:L-1))
-       do j = 1,k
-          ivector(L-1-k+j) = ivector(L-1-k+j)*min(1,lattice(j-1))
-       end do             
-       icount(k+1) = sum(ivector)
-    end do     
-    total = 1d0/sum(icount)
-
-    entropy = -sum( (total * icount)*log( total * icount  ) )              
+    integer,parameter ::isize = 10
   end function entropy
   !================================================
   function get_number_particles(idir,lattice) result(x)
