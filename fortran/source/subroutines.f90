@@ -415,16 +415,22 @@ contains
     data(3) = data(1)+data(2)
 
 
-    kk=idata_size_base
-    do k=0,Ly-1
-       kk = kk + 1
-       data(kk) = sum(min(lattice(k*Lx:(k+1)*Lx-1),1))
-    end do
+    data(4) = get_displacement(Lx,Ly,lattice)
     
-    do k=0,Ly-1
-       kk = kk + 1
-       data(kk) = data(kk-Ly)**2d0
-    end do
+    
+    !-----------------------------------
+    ! average occupation within a line for each line
+    !-----------------------------------
+    ! kk=idata_size_base
+    ! do k=0,Ly-1
+    !    kk = kk + 1
+    !    data(kk) = sum(min(lattice(k*Lx:(k+1)*Lx-1),1))
+    ! end do    
+    ! do k=0,Ly-1
+    !    kk = kk + 1
+    !    data(kk) = data(kk-Ly)**2d0
+    ! end do
+    !----------------------------------
     
     
 
@@ -442,6 +448,18 @@ contains
     integer,intent(in)::Lx,Ly,lattice(0:Lx*Ly-1)
     integer,parameter ::isize = 10
   end function entropy
+  !================================================
+  function get_displacement(Lx,Ly,lattice) result(x)
+    integer,intent(in)::Lx,Ly,lattice(0:Lx*Ly-1)
+    real*8::x
+    x = 0d0
+    !NOTE:: vectorize the code below
+    do ky=0,Ly-1
+       do kx = 0,Lx-1
+          x = x + min(lattice(kx+Lx*ky),1)*(kx*kx+ky*ky)
+       end do
+    end do
+  end function get_displacement
   !================================================
   function get_number_particles(idir,lattice) result(x)
     integer,intent(in)::lattice(:),idir

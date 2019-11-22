@@ -30,7 +30,7 @@ program main
 
 
   !idata_size = idata_size_base !+ L
-  idata_size = idata_size_base + 2*Ly
+  idata_size = idata_size_base + 1 !2*Ly
   
   
   allocate(data(0:m,idata_size),datum(0:m,idata_size))
