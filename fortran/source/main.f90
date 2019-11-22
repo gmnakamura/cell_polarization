@@ -28,8 +28,11 @@ program main
   !data initialization
   m = int(isteps/idata_skip) +1 !- 1
 
-!  idata_size_base = 3
-  idata_size = idata_size_base !+ L
+
+  !idata_size = idata_size_base !+ L
+  idata_size = idata_size_base + 2*Ly
+  
+  
   allocate(data(0:m,idata_size),datum(0:m,idata_size))
   data = 0d0
   datum = 0d0
@@ -47,7 +50,7 @@ program main
   open(9, file=trim(ifilename)//"_density.dat")
   islices = int(isteps/idata_skip)
   do islice=0,islices - 1
-     write(9 ,*) islice*idata_skip,data(islice,1:idata_size_base)    
+     write(9 ,*) islice*idata_skip,real(data(islice,1:idata_size),4)
   end do
   close(9)
 

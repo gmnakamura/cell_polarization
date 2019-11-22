@@ -28,7 +28,7 @@ module subroutines
 
 
   ! parameters related to measurements
-  integer,parameter::idata_size_base = 6
+  integer,parameter::idata_size_base = 3
 contains
   function ichoice(ivector)
     !================================================
@@ -412,13 +412,20 @@ contains
     
     data(1) = count(lattice.eq.1)
     data(2) = count(lattice.gt.1)
-    !    data(3) = data(1)+data(2)
+    data(3) = data(1)+data(2)
 
-    data(3) = sum(min(lattice(0:2*Lx-1),1)) 
-    data(4) = data(3)**2d0
-    data(5) = sum(min(lattice(0:1),1)) 
-    data(6) = data(5)**2d0
 
+    kk=idata_size_base
+    do k=0,Ly-1
+       kk = kk + 1
+       data(kk) = sum(min(lattice(k*Lx:(k+1)*Lx-1),1))
+    end do
+    
+    do k=0,Ly-1
+       kk = kk + 1
+       data(kk) = data(kk-Ly)**2d0
+    end do
+    
     
 
 !    data(3) = entropy(Lx,Ly,lattice)
