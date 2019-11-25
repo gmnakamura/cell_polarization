@@ -40,10 +40,20 @@ program main
 
   !$OMP PARALLEL DO private(datum,lattice) 
   do isample=1,isamples
+     datum = 0d0
      call sample_fixedtime(Lx,Ly,params,idata_skip,datum)
      !$OMP CRITICAL
      data = data + datum*1d0/isamples
      !$OMP END CRITICAL
+
+
+     ! islices = int(isteps/idata_skip)
+     ! do islice=0,islices - 1
+     !    write(10 ,*) islice*idata_skip,real(datum(islice,1:idata_size),4)
+     ! end do
+     ! write(10,*) ' '
+     
+     
   end do
   !$OMP END PARALLEL DO
   
