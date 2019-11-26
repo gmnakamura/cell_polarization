@@ -188,17 +188,22 @@ contains
     !================================================
     integer,intent(in)   ::Lx,Ly
     integer,intent(inout)::icells(-1:(Lx*Ly-1),0:1)
-    kx = Lx/2 
-    ky = Ly/2
+    icells = 0
+    
+    ! kx = Lx/2 
+    ! ky = Ly/2
     ! icells(-1,0)= 1
     ! icells(0,0) = kx+ky*Lx
     ! icells(0,1) = ipolarized_e2
 
+    
+    
     icells(-1,0) = Lx
     do k=0, Lx-1
        icells(k,0) = k
        icells(k,1) = ichoice(icoordination+1,1)
-    end do        
+    end do  
+    
   end subroutine boundary_conditions
   !================================================
   subroutine update_fixedtime(kcell,Lx,Ly,icells,params,rng,prob,iflag)
@@ -234,7 +239,7 @@ contains
     dt = 1d0/L
 
     !NOTE
-    !dt = 1d0/((1d0+icoordination*params(ipolarization)+params(idepolarization)))
+    dt = 1d0/(icells(-1,0)) !((1d0+icoordination*params(ipolarization)+params(idepolarization)))
     
     !! a better time interval is given by
     !
@@ -321,7 +326,7 @@ contains
     idx = 1
     call measurements(Lx,Ly,icells,data(idx,:)) ! entry data
 
-    do istep = 1,isteps              
+    do istep = 1,isteps
        call random_number(rng)
        prob  = 0d0
        iflag = 0
@@ -363,8 +368,8 @@ contains
     !================================================
     integer,intent(in) ::Lx,Ly,icells(-1:Lx*Ly-1,0:1)
     real*8 ,intent(out)::data(:)       
-    data(1) = min(1,icells(0,1)) !count(lattice.gt.1)
-    !data(3) = data(1)+data(2)
+
+    data(1) = icells(-1,0)
     k = icells(0,0)
     kx = mod(k,Lx) - (Lx/2)
     ky = k/Lx  - (Ly/2)    

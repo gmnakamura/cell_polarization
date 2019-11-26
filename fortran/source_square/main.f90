@@ -39,7 +39,7 @@ program main
   !!end of initialization
 
   
-  !$OMP PARALLEL DO private(datum,lattice) 
+  !$OMP PARALLEL DO private(datum,icells) 
   do isample=1,isamples
      datum = 0d0
      call sample_fixedtime(Lx,Ly,params,idata_skip,datum)
