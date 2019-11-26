@@ -38,6 +38,7 @@ program main
   datum = 0d0
   !!end of initialization
 
+  
   !$OMP PARALLEL DO private(datum,lattice) 
   do isample=1,isamples
      datum = 0d0

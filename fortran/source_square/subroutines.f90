@@ -18,7 +18,7 @@ module subroutines
 
 
   ! parameters related to measurements
-  integer,parameter::idata_size_base = 5
+  integer,parameter::idata_size_base = 4
 contains
   !================================================
   function ichoice(isize,ishift)
@@ -179,7 +179,7 @@ contains
     ishared(2) = 0
   end subroutine select
   !================================================
-  subroutine boundary_conditions(Lx,Ly,lattice)
+  subroutine boundary_conditions(Lx,Ly,icells)
     !================================================
     ! set all lattice sites with ky = 0 to the
     ! direction e2;
@@ -187,14 +187,21 @@ contains
     ! and removes cells with ky=Ly-1
     !================================================
     integer,intent(in)   ::Lx,Ly
-    integer,intent(inout)::lattice(0:(Lx*Ly-1))
-    integer              ::itmp(0:Lx-1) 
+    integer,intent(inout)::icells(-1:(Lx*Ly-1),0:1)
     kx = Lx/2 
-    ky = Ly/2 
-    lattice(kx+ky*Lx) = ipolarized_e2    
+    ky = Ly/2
+    ! icells(-1,0)= 1
+    ! icells(0,0) = kx+ky*Lx
+    ! icells(0,1) = ipolarized_e2
+
+    icells(-1,0) = Lx
+    do k=0, Lx-1
+       icells(k,0) = k
+       icells(k,1) = ichoice(icoordination+1,1)
+    end do        
   end subroutine boundary_conditions
   !================================================
-  subroutine update_fixedtime(kcell,Lx,Ly,lattice,icells,params,rng,prob,iflag)
+  subroutine update_fixedtime(kcell,Lx,Ly,icells,params,rng,prob,iflag)
     !================================================
     ! updates the status of lattice(k).
     !
@@ -209,14 +216,14 @@ contains
     ! it increases with each call of the subroutine
     !================================================
     integer,intent(in)   ::Lx,Ly,kcell
-    integer,intent(inout)::lattice(0:(Lx*Ly-1)),iflag,icells(-1:Lx*Ly-1)
+    integer,intent(inout)::iflag,icells(-1:Lx*Ly-1,0:1)
     real*8 ,intent(in)   ::params(7),rng
     real*8 ,intent(inout)::prob
     integer              ::ishared(2),icandidate(icoordination)    
     iflag=0
-    k = icells(kcell)      
+    k = icells(kcell,0)      
     ! get the target cell current status
-    icurrent = lattice(k)    
+    icurrent = icells(kcell,1)    
     ! determine whether the cell exists or not (binary)
     istatus  = min(1,icurrent)    
     if (istatus.eq.iempty) return ! nothing to do here
@@ -227,7 +234,7 @@ contains
     dt = 1d0/L
 
     !NOTE
-    dt = 1d0/((1d0+icoordination*params(ipolarization)+params(idepolarization)))
+    !dt = 1d0/((1d0+icoordination*params(ipolarization)+params(idepolarization)))
     
     !! a better time interval is given by
     !
@@ -237,14 +244,12 @@ contains
     !
     ! try to polarize the cell if lattice(k) = inonpolarized
     !
-    if (lattice(k).eq.inonpolarized) then
+    if (icells(kcell,1).eq.inonpolarized) then
        prob = prob + icoordination*params(ipolarization)*dt
        ! check if the test succeeded
-       itmp = icheck(prob,rng) ! itmp = 1 if rng < prob
-       ! pick a new direction
-       inew = ichoice(icoordination,inonpolarized+1)
-       lattice(k) = inew*itmp + (1-itmp)
-       iflag = inonpolarization
+       itmp = icheck(prob,rng) ! itmp = 1 if rng < prob       
+       icells(kcell,1) = (1-itmp) + itmp*ichoice(icoordination,inonpolarized+1)
+       iflag = ipolarization
        return
     end if
     !
@@ -257,16 +262,15 @@ contains
     prob   = prob+params(idepolarization)*dt
     idepol = icheck(prob,rng)
     if (idepol.eq.1) then
-       lattice(k) = inonpolarized
-       iflag      = idepolarization
+       icells(kcell,1) = inonpolarized
+       iflag           = idepolarization
        return
     end if
     !
     ! cell is polarized and failed to depolarized
     !
     ! NOTE: idirection = icurrent - 1
-    !    call select(k,icurrent-1,Lx,Ly,inext,ishared)
-
+    !    call select(k,icurrent-1,Lx,Ly,inext,ishared)       
     inext = ichoice(icoordination,1)    
     kx = mod(k,Lx)
     ky = k/Lx
@@ -274,12 +278,11 @@ contains
     icandidate(2) = kx+Lx*mod(ky+1+Ly,Ly)
     icandidate(3) = mod(kx - 1+Lx,Lx)+ky*Lx
     icandidate(4) = kx+Lx*mod(ky-1+Ly,Ly)
-    inext = icandidate(inext)
-    
+    inext = icandidate(inext)    
     !
     ! check whether the target site is empty
     !
-    istatus = istatus * (1-min(1,lattice(inext)))
+    istatus = istatus * is_free(inext,Lx,Ly,icells)
     ! istatus_contact = min(sum(lattice(ishared)),1)    
     ! !if         istatus_contact = 1, use p
     ! !otherwise, istatus_contact = 0, use q
@@ -290,11 +293,9 @@ contains
     ! prob = prob +istatus*(1-istatus_contact)*q
 
     prob = prob +istatus*dt
-
+ 
     icell_move = icheck(prob,rng)    
-    lattice(inext) = lattice(k)*icell_move+lattice(inext)*(1-icell_move)
-    lattice(k)     = lattice(k)*(1-icell_move)
-    icells(kcell)  = k*(1-icell_move) + inext*icell_move
+    icells(kcell,0) = k*(1-icell_move) + inext*icell_move
     iflag = igapjunction*icell_move
     return    
   end subroutine update_fixedtime
@@ -303,24 +304,23 @@ contains
     real*8 ,intent(in)   ::params(7)
     integer,intent(in)   ::Lx,Ly,idata_skip
     real*8 ,intent(out)  ::data(:,:)
-    integer              ::lattice(0:(Lx*Ly-1)),icells(-1:Lx*Ly-1)
-    integer,allocatable  ::iorder(:)
-
-!    idata_size = 3+Lx*Ly
-    
+    integer              ::icells(-1:Lx*Ly-1,0:1)
+    integer,allocatable  ::iorder(:)   
     isteps = int(params(3))
-    lattice = 0
-    !call boundary_conditions(Lx,Ly,lattice)
-    
-    icells(-1)=1
-    icells(0) = (Lx/2)+(Ly/2)*Lx
-    lattice = 0
-    lattice(icells(0)) = ipolarized_e2
+
+    icells = 0
+    call boundary_conditions(Lx,Ly,icells)
+
+    ! icells(-1,0)= 1
+    ! icells(0,0) = (Lx/2)+(Ly/2)*Lx
+    ! icells(0,1) = ichoice(icoordination,2)
     !
     ! measurements NOTE: deferred datatype starts as 1-index
     !
+
     idx = 1
-    call measurements(Lx,Ly,lattice,icells,data(idx,:)) ! entry data
+    call measurements(Lx,Ly,icells,data(idx,:)) ! entry data
+
     do istep = 1,isteps              
        call random_number(rng)
        prob  = 0d0
@@ -331,127 +331,45 @@ contains
        ! iorder : shuffled index of non-empty sites
        !
        !allocate(iorder,source=melanger_sansreplacement(Lx,Ly,lattice))
-       isize=icells(-1)
-       
+       isize=icells(-1,0)       
        do while ((inext_cell.LT.isize).and.(iflag.lt.1))      
-          call update_fixedtime(inext_cell,Lx,Ly,lattice,icells,&
-               params,rng,prob,iflag)
+          call update_fixedtime(inext_cell,Lx,Ly,icells,params,rng,prob,iflag)
           inext_cell = inext_cell+1
        end do
-
-       ! NOTE:: sink and source COMMENTED BELOW       
-       !
-       !       call boundary_conditions(Lx,Ly,lattice)
-       !
-       !deallocate(iorder)
-       !
-       ! only stores data every other idata_skip
-       !
        if (mod(istep,idata_skip).eq.0) then
           idx = idx+1
-          call measurements(Lx,Ly,lattice,icells,data(idx,:)) ! entry data
+          call measurements(Lx,Ly,icells,data(idx,:)) ! entry data
        end if
-
-       !
-       ! alternatively, avoid the if statemente when measurements are fast
-       !
-       ! idx = 2 + int(istep/idata_skip)
-       ! call measurements(Lx,Ly,lattice,data(idx,:))
     end do
 
   end subroutine sample_fixedtime
   !================================================
-  function melanger_sansreplacement(Lx,Ly,lattice) result(itmp)
-    integer,intent(in)   ::lattice(0:(Lx*Ly-1))
-    real*8 ,allocatable::rng(:)
-    integer,allocatable::itmp(:)
-
-    itmp = [(k, k=0,Lx*Ly-1)]    
-    !    itmp = [(k, k=Lx,Lx*(Ly-1)-1)]
-    !
-    ! NOTE:: skipping the source and the sink in
-    !        the line above
-    !
-    itmp = pack(itmp,lattice(itmp)>0)
-    L = size(itmp)
-    allocate(rng(L))
-    call random_number(rng)
-    rng = rng*L
-    do i=1,L
-       iq = int(rng(i)) + 1 ! index shift
-       ia = itmp(iq)
-       itmp(iq) = itmp(i)
-       itmp(i)  = ia
+  function is_free(k,Lx,Ly,icells)
+    integer,intent(in)::k,icells(-1:Lx*Ly,0:1)
+    integer::is_free
+    n = icells(-1,0)
+    is_free=1
+    do m =0,n-1
+       if (k.eq.icells(m,0)) then
+          is_free =1
+          return
+       end if
     end do
-  end function melanger_sansreplacement
-!================================================
-  subroutine measurements(Lx,Ly,lattice,icells,data)
+  end function is_free
+  !================================================
+  subroutine measurements(Lx,Ly,icells,data)
     !================================================
     ! returns vector data extracted from lattice
     !================================================
-    integer,intent(in) ::Lx,Ly,lattice(0:Lx*Ly-1),icells(-1:Lx*Ly-1)
-    real*8 ,intent(out)::data(:)
-    
-    ! ! number of particles in status idir
-    ! do idir = 1,min(icoordination+1,idata_size)
-    !    data(idir) = get_number_particles(idir,lattice)
-    ! end do
-
-    k = icells(0)
-    
-    data(1) = 0 !count(lattice.eq.1)
-    data(2) = min(1,lattice(k)) !count(lattice.gt.1)
+    integer,intent(in) ::Lx,Ly,icells(-1:Lx*Ly-1,0:1)
+    real*8 ,intent(out)::data(:)       
+    data(1) = min(1,icells(0,1)) !count(lattice.gt.1)
     !data(3) = data(1)+data(2)
-
+    k = icells(0,0)
     kx = mod(k,Lx) - (Lx/2)
-    ky = k/Lx  - (Ly/2)
-    
-    data(3) = kx 
-    data(4) = ky
-    data(5) = (kx**2+ky**2)
-    
+    ky = k/Lx  - (Ly/2)    
+    data(2) = kx 
+    data(3) = ky
+    data(4) = (kx**2+ky**2)    
   end subroutine measurements
-  !================================================
-  function entropy(Lx,Ly,lattice)
-    ! returns the entropy associated with finding a
-    ! contiguous block with size isize in the vector
-    ! lattice
-    integer,intent(in)::Lx,Ly,lattice(0:Lx*Ly-1)
-    integer,parameter ::isize = 10
-  end function entropy
-  !================================================
-  function get_displacement(Lx,Ly,lattice) result(x)
-    integer,intent(in)::Lx,Ly,lattice(0:Lx*Ly-1)
-    real*8::x
-    x = 0d0
-    !NOTE:: vectorize the code below
-    do ky=0,Ly-1
-       do kx = 0,Lx-1
-          x = x + min(lattice(kx+Lx*ky),1)*(kx*kx+ky*ky)
-       end do
-    end do
-  end function get_displacement
-  !================================================
-  function get_number_particles(idir,lattice) result(x)
-    integer,intent(in)::lattice(:),idir
-    integer::x
-    x = count(lattice.eq.idir)
-  end function get_number_particles
-  !================================================
-  ! function get_number_particles(lattice) result(x)
-  !   integer,intent(in)::lattice(:)
-  !   integer::x
-  !   x = sum(min(lattice,1))
-  ! end function get_number_particles
-  !================================================  
-  subroutine pretty_printing(Lx,Ly,lattice)
-    integer,intent(in)::Lx,Ly,lattice(0:(Lx*Ly-1))
-    do ky =0,Ly-1
-       if (mod(ky,2).eq.0) then
-          print *,(int( lattice(k+Lx*ky) ,2),k=0,Lx-1)
-       else
-          print *,"   ",(int( lattice(k+Lx*ky) ,2),k=0,Lx-1)
-       end if
-    end do
-  end subroutine pretty_printing
 end module subroutines
