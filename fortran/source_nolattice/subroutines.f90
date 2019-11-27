@@ -258,6 +258,7 @@ contains
     ! initial condition
     n = 1
     icells(0,1:n) = 2
+!    call init_cells(icells,n)
     idx = 1
     call measurements(n,icells,data(idx,:))
     isteps = int(params(3))

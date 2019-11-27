@@ -49,3 +49,24 @@ program main
   
   
 end program main
+
+!---------------------------------------
+! TEST 1:: particle conservation
+! result:: ...OK!
+!
+!---------------------------------------
+! TEST 2:: diffusion single particle
+!
+! expl:: one expects an effective diffusion coeff
+!       for a single particle,
+!
+!            D(eff)~ D*(Gamma/(Gamma+Lambda))
+!
+!       Gamma = pol. rate, Lambda = depol rate
+!       a) compute the squared displacement of a
+!          single particle with Gamma1 and Gamma2.
+!       b) compute the linear fit of r^2 for each Gamma
+!       c) let a_k be the angular coeff for each Gamma_k
+!       d) check if (a_1/Gamma_1)*(Gamma_2/a2) = 
+!                   = (Gamma_2+Lambda)/(Gamma_1+Lambda)
+! result:: ...OK
