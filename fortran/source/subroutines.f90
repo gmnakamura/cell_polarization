@@ -264,13 +264,9 @@ contains
     integer*1::lattice(0:Lx*Ly-1)
     icells = 0
     ! initial condition
-    n = 1
+    n = int(Lx*0.1)
     call init_cells(n,Lx,Ly,icells,lattice)
     idx = 1
-
-    ! do i=1,n
-    !    print *,int(i,1),'::',int(icells(:,i),1)
-    ! end do
     
     call measurements(n,icells,data(idx,:),params)
     isteps = int(params(3))
@@ -283,7 +279,8 @@ contains
               ! updates are not updated 
        do while ((iflag.eq.0).and.(k < n0)) 
           k = k + 1 ! TODO:: shuffle indices to remove bias
-          call update_fixedtime(k,n,Lx,Ly,icells,lattice,params,rng,prob,iflag)
+          call update_fixedtime(k,n,Lx,Ly,icells,lattice,&
+                                params,rng,prob,iflag)
        end do
        
        if (mod(istep,idata_skip).eq.0) then
@@ -291,11 +288,6 @@ contains
           call measurements(n,icells,data(idx,:),params) ! entry data
        end if
     end do
-
-    ! print *,'-------------------------'
-    ! do i=1,n
-    !    print *,int(i,1),'::',int(icells(:,i),1)
-    ! end do
     
   end subroutine sample_fixedtime
   !================================================
@@ -312,14 +304,33 @@ contains
 
     lattice =0    
     icells = 0
+    !--------------------------------------
+    ! test to match the initial conditions of
+    ! the version without lattice/hash support
+    !--------------------------------------
+    ! k0=Lx/2 + (Ly/2)*Lx
+    ! do k=1,n      
+    !    iposition = k0 + mod((k0/Ly),2)
+    !    k0=k0+2
+    !    icells(0,k) = ichoice(icoordination+1)+inonpolarized
+    !    icells(1,k) = iposition
+    !    lattice(iposition) = 1
+    ! end do
+    !--------------------------------------
 
-    k0=Lx/2 + (Ly/2)*Lx
-    do k=1,n      
-       iposition = k0 + mod((k0/Ly),2)
-       k0=k0+2
-       icells(0,k) = ichoice(icoordination+1)+inonpolarized
-       icells(1,k) = iposition
-       lattice(iposition) = 1
+    iremaining = 1
+    L = Lx*Ly
+    do while (iremaining.LT.n)
+       call random_number(rng)
+       itrial = int(rng*L)
+       itmp = 1 - lattice(itrial) ! itmp = 0  if lattice occupied
+       lattice(itrial) = itmp + (1-itmp)*lattice(itrial)
+       icells(1,iremaining) = itmp * itrial
+       iremaining = iremaining + itmp
+    end do
+
+    do i=1,n
+       icells(0,i) = ichoice(icoordination+1)+inonpolarized
     end do
        
   end subroutine init_cells
@@ -334,10 +345,19 @@ contains
     Ly = params(2)
     Lx2= Lx/2
     Ly2= Ly/2
+
+    ! measuremts to compare against results using
+    ! the version without lattice
+    !
+    ! data(1) = sum(min(1,icells(0,:))) !icells(0,1) -1  
+    ! data(2) = sum(mod(icells(1,:),Lx) - Lx2)
+    ! data(3) = sum((icells(1,:)/Lx)    - Ly2)
+    ! data(4) =sum((mod(icells(1,:),Lx)-Lx2)**2+((icells(1,:)/Lx)-Ly2)**2)
+
     
     data(1) = sum(min(1,icells(0,:))) !icells(0,1) -1  
-    data(2) = sum(mod(icells(1,:),Lx) - Lx2)
-    data(3) = sum((icells(1,:)/Lx)    - Ly2)
-    data(4) = sum((mod(icells(1,:),Lx)-Lx2)**2+ ((icells(1,:)/Lx)-Ly2)**2)
+    data(2) = sum(mod(icells(1,:),Lx))
+    data(3) = sum((icells(1,:)/Lx)   )
+    data(4) = sum((mod(icells(1,:),Lx))**2+((icells(1,:)/Lx))**2)
   end subroutine measurements
 end module subroutines
