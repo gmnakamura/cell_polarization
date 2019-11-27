@@ -398,6 +398,7 @@ contains
     islices = L - ibsize
 
     do k=0,islices
+       !TODO
     end do
     
   end subroutine entropy
