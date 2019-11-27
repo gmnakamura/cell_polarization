@@ -30,6 +30,7 @@ module subroutines
 
   integer::iversor(0:icoords,0:icoordination)
 
+  
 contains
   !================================================
   function ichoice(n)
@@ -380,4 +381,24 @@ contains
     
   end subroutine measurements
   !================================================
+  subroutine entropy(n,Lx,Ly,icells,lattice,data)
+    !-------------------------------------------
+    ! extracts the entropy of the configuration
+    !-------------------------------------------
+    integer  ,intent(in) ::icells(0:1,n),Lx,Ly
+    integer*1,intent(in) ::lattice(0:Lx*Ly-1)
+    real*8 ,intent(out)::data(:)
+    integer,parameter::ibsize=8
+    integer::ibyte(0:ibsize-1) ! consider adding to the module and ini
+    
+    
+    ibyte = [(2**k,k=0,ibsize-1)]
+
+    L = Lx*Ly
+    islices = L - ibsize
+
+    do k=0,islices
+    end do
+    
+  end subroutine entropy
 end module subroutines

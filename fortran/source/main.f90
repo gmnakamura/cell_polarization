@@ -28,6 +28,7 @@ program main
   ! end of initialization
 
   n = N0
+
   
   !$OMP PARALLEL DO private(datum,icells,lattice)
   do isample = 1,isamples
