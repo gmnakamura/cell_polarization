@@ -162,7 +162,7 @@ contains
     get_neighbour = iversor(:,idirection)
   end function get_neighbour
   !================================================
-  subroutine update_fixedtime(k,icells,n,params,rng,prob,iflag)    
+  subroutine update_fixedtime(k,icells,lattice,n,params,rng,prob,iflag)    
     !-------------------------------------------
     ! updates the k-th cell in icells during the
     ! time interval delta t, with probability prob
@@ -183,6 +183,20 @@ contains
     dt = 1d0 / (params(Lx_)*params(Ly_))
 
     dt = 1d0/n ! oversimplification 
+
+    !------------------------------------------------
+    ! randow_walker behavior (uncomment for testing)
+    !
+    ! rw = 1d0 ! or 0d0
+    ! prob = prob + rw
+    ! if (icheck(prob,rng).eq.1) then
+    !    idir = ichoice(icoordination)+1
+    !    icells(:,k) = icells(:,k)+iversor(:,idir)
+    !    iflag = 100
+    !    return
+    ! end if
+    !------------------------------------------------
+
     
     ! check whether the cell is polarized or not
     ! if non-polarized, try to polarize it in a
@@ -214,18 +228,6 @@ contains
     !        followed by a random choice in direction)
     !        Polarization prevents multiple directions
 
-    !------------------------------------------------
-    ! randow_walker behavior (uncomment for testing)
-    !
-    ! rw = 1d0 ! or 0d0
-    ! prob = prob + rw
-    ! if (icheck(prob,rng).eq.1) then
-    !    idir = ichoice(icoordination)+1
-    !    icells(:,k) = icells(:,k)+iversor(:,idir)
-    !    iflag = 100
-    !    return
-    ! end if
-    !------------------------------------------------
     ! polarized_cell behavior
     icurrent = icells(0,k) - inonpolarized
     iaux = icells(:,k) + iversor(:,icurrent)
