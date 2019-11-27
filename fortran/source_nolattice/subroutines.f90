@@ -15,11 +15,12 @@ module subroutines
 
   integer,parameter::Lx_=1
   integer,parameter::Ly_=2
-  integer,parameter::igapjunction    = 5
-  integer,parameter::idepolarization = 6
-  integer,parameter::ipolarization   = 7
+  integer,parameter::ihopping        = 5
+  integer,parameter::igapjunction    = 6
+  integer,parameter::idepolarization = 7
+  integer,parameter::ipolarization   = 8
   
-  integer,parameter::iparams_size = 7
+  integer,parameter::iparams_size = 8
   
   ! parameters related to measurements
   integer,parameter::idata_size_base = 4
@@ -58,8 +59,9 @@ contains
 
     ! default values
     ! Lx,Ly = 11 , steps = 100 , samples =100 ,
-    ! gapjunction = 0.5, depolarization = 0.0 , polarization = 0.0
-    fargs = (/ 11d0, 11d0, 1d2 , 1d2 , 5d-1 , 0d0, 0d0/)
+    ! hopping        = 1.0, gapjunction  = 0.5,
+    ! depolarization = 0.0, polarization = 0.0
+    fargs = (/ 11d0, 11d0, 1d2 , 1d2 , 1d0, 5d-1 , 1d-1, 1d-1/)
     ! default data skip
     idata_skip_factor = 4
     
@@ -85,18 +87,22 @@ contains
           call get_command_argument(i+1,arg)
           read(arg,*) fargs(4)
           ifilename = trim(ifilename)//'_samples'//trim(arg)
+       case ('--hopping','-o')          
+          call get_command_argument(i+1,arg)
+          read(arg,*) fargs(ihopping)
+          ifilename = trim(ifilename)//'_hop'//trim(arg)
        case ('--gap-junction','-g')          
           call get_command_argument(i+1,arg)
           read(arg,*) fargs(igapjunction)
-          ifilename = trim(ifilename)//'_gapjunction'//trim(arg)
+          ifilename = trim(ifilename)//'_gap'//trim(arg)
        case ('--depolarization','-d')          
           call get_command_argument(i+1,arg)
           read(arg,*) fargs(idepolarization)
-          ifilename = trim(ifilename)//'_depolarization'//trim(arg)
+          ifilename = trim(ifilename)//'_depol'//trim(arg)
        case ('--polarization','-p')          
           call get_command_argument(i+1,arg)
           read(arg,*) fargs(ipolarization)
-          ifilename = trim(ifilename)//'_polarization'//trim(arg)
+          ifilename = trim(ifilename)//'_pol'//trim(arg)
        case ('--skip')          
           call get_command_argument(i+1,arg)
           read(arg,*) idata_skip_factor          
@@ -127,6 +133,7 @@ contains
     print *,"isteps    = ",int(fargs(3))
     print *,"isamples  = ",int(fargs(4))
     print *,""
+    print *,"hopping        rate = ",fargs(ihopping)
     print *,"gap-junction   rate = ",fargs(igapjunction)
     print *,"depolarization rate = ",fargs(idepolarization)
     print *,"polarization   rate = ",fargs(ipolarization)
@@ -203,17 +210,19 @@ contains
     !        directions with equal chance (one test
     !        followed by a random choice in direction)
     !        Polarization prevents multiple directions
-    
-    ! randow_walker behavior
-    rw = 1d0 ! or 0d0
-    prob = prob + rw
-    if (icheck(prob,rng).eq.1) then
-       idir = ichoice(icoordination)+1
-       icells(:,k) = icells(:,k)+iversor(:,idir)
-       iflag = 100
-       return
-    end if
 
+    !------------------------------------------------
+    ! randow_walker behavior (uncomment for testing)
+    !
+    ! rw = 1d0 ! or 0d0
+    ! prob = prob + rw
+    ! if (icheck(prob,rng).eq.1) then
+    !    idir = ichoice(icoordination)+1
+    !    icells(:,k) = icells(:,k)+iversor(:,idir)
+    !    iflag = 100
+    !    return
+    ! end if
+    !------------------------------------------------
     ! polarized_cell behavior
     icurrent = icells(0,k) - inonpolarized
     iaux = icells(:,k) + iversor(:,icurrent)
@@ -221,9 +230,13 @@ contains
     !
     ! ignore the neighbouring problem for now (so it's not gapjunction)
     !
-    p = params(igapjunction)
-    q = 1d0 - params(igapjunctotion)
+    p = params(igapjunction)*params(ihopping)
+    q = (1d0 - params(igapjunction))*params(ihopping)
+    !
+    ! TODO::
+    !
     is_shared = 0 ! ignore the neighbouring problem for now
+
     
     prob = prob + dt*p*istatus
     prob = prob + dt*q*istatus*is_shared
@@ -253,7 +266,8 @@ contains
        prob = 0d0
        iflag= 0
        k = 0
-       do while (iflag.eq.0) 
+       n0 = n
+       do while ((iflag.eq.0).and.(k < n0)) 
           k = k + 1
           !print *,'entrou',k,istep
           call update_fixedtime(k,icells,n,params,rng,prob,iflag)
