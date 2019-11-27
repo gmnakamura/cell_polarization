@@ -270,7 +270,7 @@ contains
     call init_cells(n,Lx,Ly,icells,lattice)
     idx = 1
     
-    call measurements(n,icells,data(idx,:),params)
+    call measurements(n,Lx,Ly,icells,data(idx,:))
     isteps = int(params(isteps_))
     do istep = 1,isteps
        call random_number(rng)
@@ -287,7 +287,7 @@ contains
        
        if (mod(istep,idata_skip).eq.0) then
           idx = idx+1
-          call measurements(n,icells,data(idx,:),params) ! entry data
+          call measurements(n,Lx,Ly,icells,data(idx,:)) ! entry data
        end if
     end do
     
@@ -356,14 +356,16 @@ contains
        
   end subroutine init_cells
   !================================================
-  subroutine measurements(n,icells,data,params)
+  subroutine measurements(n,Lx,Ly,icells,data)
     !-------------------------------------------
+    ! extract data from icells
+    !
+    ! OBS: the subroutine assumes the center of
+    !      the lattice sits over (Lx/2,Ly/2)
     !-------------------------------------------
-    integer,intent(in) ::icells(0:1,n)
+    integer,intent(in) ::icells(0:1,n),Lx,Ly
     real*8 ,intent(out)::data(:)
-    real*8 ,intent(in) ::params(iparams_size)
-    Lx = params(1)
-    Ly = params(2)
+
     Lx2= Lx/2
     Ly2= Ly/2
 
@@ -376,9 +378,6 @@ contains
     data(4) =sum((mod(icells(1,:),Lx)-Lx2)**2+((icells(1,:)/Lx)-Ly2)**2)
 
     
-    ! data(1) = sum(min(1,icells(0,:))) !icells(0,1) -1  
-    ! data(2) = sum(mod(icells(1,:),Lx))
-    ! data(3) = sum((icells(1,:)/Lx)   )
-    ! data(4) = sum((mod(icells(1,:),Lx))**2+((icells(1,:)/Lx))**2)
   end subroutine measurements
+  !================================================
 end module subroutines
