@@ -12,14 +12,12 @@ program main
 
   idata_skip = 0
   call read_args(params,ifilename,idata_skip)
-  Lx = int(params(1))
-  Ly = int(params(2))
   isteps   = int(params(3))
   isamples = int(params(4))
-  L = Lx*Ly
-  is_zero = min(1,idata_skip)
-  idata_skip = (1-is_zero)+is_zero*(int(L/max(1,idata_skip))-1)
+  is_notzero = min(1,idata_skip)
+  idata_skip = is_notzero*idata_skip+(1-is_notzero)
   ! data initialization
+  call init_shared()
   m = int(isteps/idata_skip) +1 !- 1
   idata_size = idata_size_base      
   allocate(data(0:m,idata_size),datum(0:m,idata_size))
@@ -27,7 +25,6 @@ program main
   datum = 0d0
   ! end of initialization
 
-  call init_shared()
   
   !$OMP PARALLEL DO private(datum,icells)
   do isample = 1,isamples
@@ -67,6 +64,8 @@ end program main
 !          single particle with Gamma1 and Gamma2.
 !       b) compute the linear fit of r^2 for each Gamma
 !       c) let a_k be the angular coeff for each Gamma_k
-!       d) check if (a_1/Gamma_1)*(Gamma_2/a2) = 
-!                   = (Gamma_2+Lambda)/(Gamma_1+Lambda)
+!       d) check if a_2/a_1 ~ D_2/D_1
+!       e) EX: Gamma_1/Gamma_2 = 0.1/1.0, Lambda = 0.1
+!              a2/a1 ~ 1.83
+!              D2/D1 ~ 1.8181818
 ! result:: ...OK

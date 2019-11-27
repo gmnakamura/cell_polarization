@@ -26,7 +26,9 @@ module subroutines
   integer,parameter::idata_size_base = 4
 
   integer::iversor(0:icoords,0:icoordination)
-  
+
+  ! maximum number of particles
+  integer,parameter::nmax=256 
 contains
   !================================================
   function ichoice(n)
@@ -63,7 +65,7 @@ contains
     ! depolarization = 0.0, polarization = 0.0
     fargs = (/ 11d0, 11d0, 1d2 , 1d2 , 1d0, 5d-1 , 1d-1, 1d-1/)
     ! default data skip
-    idata_skip_factor = 4
+    idata_skip_factor = 0
     
     ifilename =  "data"    
     
@@ -107,13 +109,13 @@ contains
           call get_command_argument(i+1,arg)
           read(arg,*) idata_skip_factor          
           ! if 0, then use all data
-          idata_skip_factor = max(0,idata_skip_factor)
+          idata_skip_factor = int(max(0,idata_skip_factor))
           if (idata_skip_factor.EQ.0) arg='0'
 !          write(arg,'(I1)') int(idata_skip_factor,1)
           ifilename = trim(ifilename)//'_dataskip'//trim(arg)
        case('-h','--help')
           print *,'example usage'
-          print *,'main -x 10 -y 10 --samples 100 --steps 100 --gap-junction 0.5 --polarization 0.05 --depolarization 0.1 --skip 4'
+          print *,'main -x 10 -y 10 --samples 100 --steps 100 --gap-junction 0.5 --polarization 0.05 --depolarization 0.1 --skip 0'
           print *,' '
           print *,'OBS: --skip 0 or any negative number forces collection of data at each time interval'
           call exit(0)
@@ -138,7 +140,7 @@ contains
     print *,"depolarization rate = ",fargs(idepolarization)
     print *,"polarization   rate = ",fargs(ipolarization)
     print *," "
-    print *,"filename = ",ifilename
+    print *,"filename = ",trim(ifilename)
     print *,"************************"
   end subroutine read_args
   !================================================
@@ -191,7 +193,7 @@ contains
        ! new direction chosen from uniform distribution
        ! [0,icoordination-1] + shift 
        icells(0,k) = (1-itmp)+ itmp*(ichoice(icoordination)+ipolarized_e1)
-       iflag = ipolarization
+       iflag = ipolarization*itmp
        return
     end if
     !
@@ -200,6 +202,7 @@ contains
 
     ! try to depolarize it
     prob = prob + dt*params(idepolarization)
+    
     if (icheck(prob,rng).eq.1) then
        icells(0,k) = inonpolarized
        iflag = idepolarization
@@ -249,38 +252,46 @@ contains
   subroutine sample_fixedtime(params,idata_skip,data)    
     !-------------------------------------------
     !-------------------------------------------
-    integer,parameter::nmax=10
     real*8 ,intent(in)   ::params(iparams_size)
     integer,intent(in)   ::idata_skip
     real*8 ,intent(inout)::data(:,:)
     integer::icells(0:icoords,nmax)
     icells = 0
     ! initial condition
-    n = 1
-    icells(0,1:n) = 2
-!    call init_cells(icells,n)
+    n = int(params(Lx_))
+!    icells(0,1:n) = 2
+    call init_cells(n,icells)
     idx = 1
+
+    ! do i=1,n
+    !    print *,int(i,1),'::',int(icells(:,i),1)
+    ! end do
+    
     call measurements(n,icells,data(idx,:))
     isteps = int(params(3))
     do istep = 1,isteps
        call random_number(rng)
-       prob = 0d0
-       iflag= 0
-       k = 0
-       n0 = n
+       prob  = 0d0
+       iflag = 0
+       k  = 0
+       n0 = n ! dirty fix: make sure particles created within
+              ! updates are not updated 
        do while ((iflag.eq.0).and.(k < n0)) 
-          k = k + 1
-          !print *,'entrou',k,istep
+          k = k + 1 ! TODO:: shuffle indices to remove bias
           call update_fixedtime(k,icells,n,params,rng,prob,iflag)
-!          print *,'saiu',k,istep,iflag,int(icells(1:2,1),1)
        end do
+       
        if (mod(istep,idata_skip).eq.0) then
           idx = idx+1
-          !print *,'entrou 2',istep
           call measurements(n,icells,data(idx,:)) ! entry data
-          !print *,'saiu 2',istep
        end if
-    end do 
+    end do
+
+    ! print *,'-------------------------'
+    ! do i=1,n
+    !    print *,int(i,1),'::',int(icells(:,i),1)
+    ! end do
+    
   end subroutine sample_fixedtime
   !================================================
   function is_free(iaux,icells,n)
@@ -301,15 +312,37 @@ contains
     is_free = 1 - min(1,int(sum(terrible)))
   end function is_free
   !================================================
+  subroutine init_cells(n,icells)
+    !-------------------------------------------
+    ! initialize icells as follows
+    ! x_1 0   x_2  0   x_3 ...
+    !  0  x_5  0  x_6   0  ...
+    ! ...          0   x_n ...
+    !-------------------------------------------
+    integer,intent(in)   ::n
+    integer,intent(inout)::icells(0:icoords,n)
+    integer::isize,L,ix,iy
+    
+    icells = 0
+    L = int(sqrt(n*1d0))
+    do k = 1,n
+       icells(0,k) = ichoice(icoordination+1)+inonpolarized
+       iy = int((k - 1)/L)
+       icells(1,k) = 2*mod(k-1,L) + mod(iy,2)
+       icells(2,k) = 2*iy
+    end do
+    
+  end subroutine init_cells
+  !================================================
   subroutine measurements(n,icells,data)
     !-------------------------------------------
     !-------------------------------------------
     integer,intent(in) ::icells(0:icoords,n)
     real*8 ,intent(out)::data(:)
 
-    data(1) = sum(min(1,icells(0,:)))
-    data(2) = icells(1,1)
-    data(3) = icells(2,1)
-    data(4) = icells(1,1)**2+ icells(2,1)**2
+    data(1) = sum(min(1,icells(0,:))) !icells(0,1) -1  
+    data(2) = sum(icells(1,:))
+    data(3) = sum(icells(2,:))
+    data(4) = sum(icells(1,:)**2+ icells(2,:)**2)
   end subroutine measurements
 end module subroutines
