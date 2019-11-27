@@ -2,44 +2,34 @@ program main
   use omp_lib
   use subroutines
   implicit real*8(a-h,o-z)
-  real*8       ::params(7)
-  character*128::ifilename
+  !-------------------
+  !PARAMETERS
+  !-------------------
+  character*256::ifilename
+  real*8       ::params(iparams_size)
   real*8 ,allocatable::data(:,:),datum(:,:)
-  
+  integer,allocatable::icells(:,:)
+
+  idata_skip = 0
   call read_args(params,ifilename,idata_skip)
-  Lx = int(params(1))
-  Ly = int(params(2))
+  Lx       = int(params(1))
+  Ly       = int(params(2))
   isteps   = int(params(3))
   isamples = int(params(4))
-  L = Lx*Ly
-  !
-  ! Data storage can grow really fast with
-  ! lattice size as the time interval shrinks
-  ! with L. Therefore, it is convenient to
-  ! only store data every other idata_skip steps
-  !
-  is_zero = min(1,idata_skip)
-  idata_skip = (1-is_zero)+is_zero*(int(L/max(1,idata_skip))-1)
-
-  
-  !idata_skip = int(L/4) ! set it to 1 to storage all time steps
-  !
-  !
-  !data initialization
+  is_notzero = min(1,idata_skip)
+  idata_skip = is_notzero*idata_skip+(1-is_notzero)
+  ! data initialization
   m = int(isteps/idata_skip) +1 !- 1
-
-
-  !idata_size = idata_size_base !+ L
-  idata_size = idata_size_base  !2*Ly
-  
-  
+  idata_size = idata_size_base      
   allocate(data(0:m,idata_size),datum(0:m,idata_size))
   data = 0d0
   datum = 0d0
-  !!end of initialization
+  ! end of initialization
 
-  !$OMP PARALLEL DO private(datum,lattice) 
-  do isample=1,isamples
+  
+  !$OMP PARALLEL DO private(datum,icells)
+  do isample = 1,isamples
+     datum = 0d0
      call sample_fixedtime(Lx,Ly,params,idata_skip,datum)
      !$OMP CRITICAL
      data = data + datum*1d0/isamples
@@ -47,61 +37,36 @@ program main
   end do
   !$OMP END PARALLEL DO
   
-  open(9, file=trim(ifilename)//"_density.dat")
+  
+  open(9, file=trim(ifilename)//".dat")
   islices = int(isteps/idata_skip)
   do islice=0,islices - 1
      write(9 ,*) islice*idata_skip,real(data(islice,1:idata_size),4)
   end do
   close(9)
-
-  ! open(10, file=trim(ifilename)//"_lattice.dat")
-  ! islices = int(isteps/idata_skip)
-  ! do islice=0,islices - 1
-  !    write(10 ,*) islice*idata_skip,data(islice,idata_size_base+1:idata_size)    
-  ! end do
-  ! close(10)
-
+  
+  
 end program main
 
+!---------------------------------------
+! TEST 1:: particle conservation
+! result:: ...OK!
 !
-!CHECKS:
+!---------------------------------------
+! TEST 2:: diffusion single particle
 !
-! ==================================================
-! TEST #1::
+! expl:: one expects an effective diffusion coeff
+!       for a single particle,
 !
-! - parameters
-! a) params(idepolarization) = params(ipolarization)*icoordination
-! b) params(igapjunction)    = 0.5
+!            D(eff)~ D*(Gamma/(Gamma+Lambda))
 !
-! - expected results
-! a) polarized particles should be equal to the number of
-!    nonpolarized cells
-! b) count(lattice == ipolarized) = count(lattice > ipolarized)
-!
-
-! ==================================================
-! TEST #2::
-!
-! - parameters
-! a) params(idepolarization) = 0
-! b) params(ipolarization)   = 0
-! c) params(igapjunction)    = 0.5
-! d) Ly = 4 (for the boundary condition with 2 initial rows) 
-!
-! - expected results
-! a) equilibrium density of particles in direction e2
-! b) <lattice>/ipolarized_e2 = (1/2) 
-! 
-
-! ==================================================
-! TEST #3::
-!
-! - parameters
-! a) params(idepolarization) = 0
-! b) params(ipolarization)   = 0
-! c) params(igapjunction)    = 0.5
-!
-! - expected results
-! a) equilibrium density of particles in direction e2
-! b) <lattice>/ipolarized_e2 = (2/Ly) 
-! 
+!       Gamma = pol. rate, Lambda = depol rate
+!       a) compute the squared displacement of a
+!          single particle with Gamma1 and Gamma2.
+!       b) compute the linear fit of r^2 for each Gamma
+!       c) let a_k be the angular coeff for each Gamma_k
+!       d) check if a_2/a_1 ~ D_2/D_1
+!       e) EX: Gamma_1/Gamma_2 = 0.1/1.0, Lambda = 0.1
+!              a2/a1 ~ 1.83
+!              D2/D1 ~ 1.8181818
+! result:: ...OK

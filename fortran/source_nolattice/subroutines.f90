@@ -28,7 +28,7 @@ module subroutines
   integer::iversor(0:icoords,0:icoordination)
 
   ! maximum number of particles
-  integer,parameter::nmax=256 
+  integer,parameter::nmax=128
 contains
   !================================================
   function ichoice(n)
@@ -162,15 +162,15 @@ contains
     get_neighbour = iversor(:,idirection)
   end function get_neighbour
   !================================================
-  subroutine update_fixedtime(k,icells,lattice,n,params,rng,prob,iflag)    
+  subroutine update_fixedtime(k,n,icells,params,rng,prob,iflag)    
     !-------------------------------------------
     ! updates the k-th cell in icells during the
     ! time interval delta t, with probability prob
     !
     ! upon success, returns non-null iflag
-    !-------------------------------------------
+    !------------------------------------------
     integer,intent(in)   ::k,n
-    integer,intent(inout)::iflag,icells(0:icoords,n)
+    integer,intent(inout)::iflag,icells(0:icoords,nmax)
     real*8 ,intent(in)   ::params(iparams_size),rng
     real*8 ,intent(inout)::prob
     integer::iaux(0:icoords),itmp
@@ -280,7 +280,7 @@ contains
               ! updates are not updated 
        do while ((iflag.eq.0).and.(k < n0)) 
           k = k + 1 ! TODO:: shuffle indices to remove bias
-          call update_fixedtime(k,icells,n,params,rng,prob,iflag)
+          call update_fixedtime(k,n,icells,params,rng,prob,iflag)
        end do
        
        if (mod(istep,idata_skip).eq.0) then
@@ -326,13 +326,20 @@ contains
     integer::isize,L,ix,iy
     
     icells = 0
-    L = int(sqrt(n*1d0))
-    do k = 1,n
+   ! L = int(sqrt(n*1d0))
+   ! do k = 1,n
+   !    icells(0,k) = ichoice(icoordination+1)+inonpolarized
+   !    iy = int((k - 1)/L)
+   !    icells(1,k) = 2*mod(k-1,L) + mod(iy,2)
+   !    icells(2,k) = 2*iy
+   ! end do
+
+   k0 = 0
+   do k =1,n
        icells(0,k) = ichoice(icoordination+1)+inonpolarized
-       iy = int((k - 1)/L)
-       icells(1,k) = 2*mod(k-1,L) + mod(iy,2)
-       icells(2,k) = 2*iy
-    end do
+       icells(1,k) = k0
+       k0=k0+2
+   end do
     
   end subroutine init_cells
   !================================================
