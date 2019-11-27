@@ -15,12 +15,15 @@ module subroutines
 
   integer,parameter::Lx_=1
   integer,parameter::Ly_=2
-  integer,parameter::ihopping        = 5
-  integer,parameter::igapjunction    = 6
-  integer,parameter::idepolarization = 7
-  integer,parameter::ipolarization   = 8
+  integer,parameter::n_ =3
+  integer,parameter::isteps_=4
+  integer,parameter::isamples_=5
+  integer,parameter::ihopping        = 6
+  integer,parameter::igapjunction    = 7
+  integer,parameter::idepolarization = 8
+  integer,parameter::ipolarization   = 9
   
-  integer,parameter::iparams_size = 8
+  integer,parameter::iparams_size = 9
   
   ! parameters related to measurements
   integer,parameter::idata_size_base = 4
@@ -58,10 +61,10 @@ contains
     character(len=*),intent(out)::ifilename
 
     ! default values
-    ! Lx,Ly = 11 , steps = 100 , samples =100 ,
+    ! Lx,Ly,n = 11 , steps = 100 , samples =100 ,
     ! hopping        = 1.0, gapjunction  = 0.5,
     ! depolarization = 0.0, polarization = 0.0
-    fargs = (/ 11d0, 11d0, 1d2 , 1d2 , 1d0, 5d-1 , 1d-1, 1d-1/)
+    fargs = (/ 11d0, 11d0, 11d0, 1d2 , 1d2 , 1d0, 5d-1 , 1d-1, 1d-1/)
     ! default data skip
     idata_skip_factor = 0
     
@@ -81,11 +84,11 @@ contains
           ifilename = trim(ifilename)//'_y'//trim(arg)          
        case ('--steps','-s')
           call get_command_argument(i+1,arg)
-          read(arg,*) fargs(3)
+          read(arg,*) fargs(isteps_)
           ifilename = trim(ifilename)//'_steps'//trim(arg)
        case ('--samples','-mc')
           call get_command_argument(i+1,arg)
-          read(arg,*) fargs(4)
+          read(arg,*) fargs(isamples_)
           ifilename = trim(ifilename)//'_samples'//trim(arg)
        case ('--hopping','-o')          
           call get_command_argument(i+1,arg)
@@ -128,10 +131,11 @@ contains
     print *,"************************"
     print *," "
     print *,"Starting parameters for hexagonal lattice :: "
-    print *,"Lx        = ",int(fargs(1))
-    print *,"Ly        = ",int(fargs(2))
-    print *,"isteps    = ",int(fargs(3))
-    print *,"isamples  = ",int(fargs(4))
+    print *,"Lx        = ",int(fargs(Lx_))
+    print *,"Ly        = ",int(fargs(Ly_))
+    print *,"N0        = ",int(fargs(n_))
+    print *,"isteps    = ",int(fargs(isteps_))
+    print *,"isamples  = ",int(fargs(isamples_))
     print *,""
     print *,"hopping        rate = ",fargs(ihopping)
     print *,"gap-junction   rate = ",fargs(igapjunction)
@@ -254,22 +258,20 @@ contains
     iflag = itmp*igapjunction    
   end subroutine update_fixedtime
   !================================================
-  subroutine sample_fixedtime(Lx,Ly,params,idata_skip,data)    
+  subroutine sample_fixedtime(n,Lx,Ly,params,idata_skip,data)    
     !-------------------------------------------
     !-------------------------------------------
     real*8 ,intent(in)   ::params(iparams_size)
-    integer,intent(in)   ::idata_skip
+    integer,intent(in)   ::idata_skip,n
     real*8 ,intent(inout)::data(:,:)
     integer  ::icells(0:1,Lx*Ly)
     integer*1::lattice(0:Lx*Ly-1)
-    icells = 0
-    ! initial condition
-    n = int(Lx*0.1)
+    
     call init_cells(n,Lx,Ly,icells,lattice)
     idx = 1
     
     call measurements(n,icells,data(idx,:),params)
-    isteps = int(params(3))
+    isteps = int(params(isteps_))
     do istep = 1,isteps
        call random_number(rng)
        prob  = 0d0
@@ -301,6 +303,8 @@ contains
     integer  ,intent(in)   ::n,Lx,Ly
     integer  ,intent(inout)::icells(0:1,Lx*Ly)
     integer*1,intent(inout)::lattice(0:Lx*Ly-1)
+    integer::itmp(0:Lx*Ly-1)
+    real*8 ::rng(0:Lx*Ly-1)
 
     lattice =0    
     icells = 0
@@ -320,18 +324,35 @@ contains
 
     iremaining = 1
     L = Lx*Ly
-    do while (iremaining.LT.n)
-       call random_number(rng)
-       itrial = int(rng*L)
-       itmp = 1 - lattice(itrial) ! itmp = 0  if lattice occupied
-       lattice(itrial) = itmp + (1-itmp)*lattice(itrial)
-       icells(1,iremaining) = itmp * itrial
-       iremaining = iremaining + itmp
+
+    itmp = [(k,k=0,L-1)]
+    call random_number(rng)
+
+
+    ! first particle will be put in the center
+    kx = Lx / 2
+    ky = Ly / 2
+    kcenter = kx + ky*Lx
+    !iaux = itmp(0)
+    itmp(0) = kcenter !itmp(kcenter)
+    itmp(kcenter) = 0 !iaux
+
+    ! only shuffle the others
+    do i=1,L-1
+       idx  = int(rng(i)*(L-1)) + 1 ! always skip index 0 
+       iaux = itmp(i)
+       itmp(i)  = itmp(idx)
+       itmp(idx)= iaux
     end do
 
-    do i=1,n
-       icells(0,i) = ichoice(icoordination+1)+inonpolarized
+
+    
+    do i=0,n-1
+       icells(0,i+1) = ichoice(icoordination+1)+inonpolarized
+       icells(1,i+1) = itmp(i)
+       lattice(itmp(i)) = 1       
     end do
+
        
   end subroutine init_cells
   !================================================
@@ -349,15 +370,15 @@ contains
     ! measuremts to compare against results using
     ! the version without lattice
     !
-    ! data(1) = sum(min(1,icells(0,:))) !icells(0,1) -1  
-    ! data(2) = sum(mod(icells(1,:),Lx) - Lx2)
-    ! data(3) = sum((icells(1,:)/Lx)    - Ly2)
-    ! data(4) =sum((mod(icells(1,:),Lx)-Lx2)**2+((icells(1,:)/Lx)-Ly2)**2)
+    data(1) = sum(min(1,icells(0,:)))
+    data(2) = sum(mod(icells(1,:),Lx) - Lx2)
+    data(3) = sum((icells(1,:)/Lx)    - Ly2)
+    data(4) =sum((mod(icells(1,:),Lx)-Lx2)**2+((icells(1,:)/Lx)-Ly2)**2)
 
     
-    data(1) = sum(min(1,icells(0,:))) !icells(0,1) -1  
-    data(2) = sum(mod(icells(1,:),Lx))
-    data(3) = sum((icells(1,:)/Lx)   )
-    data(4) = sum((mod(icells(1,:),Lx))**2+((icells(1,:)/Lx))**2)
+    ! data(1) = sum(min(1,icells(0,:))) !icells(0,1) -1  
+    ! data(2) = sum(mod(icells(1,:),Lx))
+    ! data(3) = sum((icells(1,:)/Lx)   )
+    ! data(4) = sum((mod(icells(1,:),Lx))**2+((icells(1,:)/Lx))**2)
   end subroutine measurements
 end module subroutines
