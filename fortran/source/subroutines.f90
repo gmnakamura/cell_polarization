@@ -30,6 +30,9 @@ module subroutines
 
   integer::iversor(0:icoords,0:icoordination)
 
+  integer,parameter::istate=0
+  integer,parameter::ilabel_int=1
+  integer,parameter::ilabel_bit=2
   
 contains
   !================================================
