@@ -359,9 +359,9 @@ contains
     icells = 0
     k0 = 0
     L = int(sqrt(n*1d0))
-    ispacing = 4
+    ispacing =  1 !2 !4
     ihalfspacing = max(ispacing/2,1)
-    ishift = int(L/2)*ispacing
+    ishift = int(L/2)*ispacing 
     
     do k = 0,n-1
        kx = mod(k,L)
