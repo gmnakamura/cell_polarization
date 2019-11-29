@@ -43,6 +43,15 @@ program main
      write(9 ,*) islice*idata_skip,real(data(islice,1:idata_size),4)
   end do
   close(9)
+
+  !------------------------------
+  print *,'.................... done'
+  print *,'saving single config ...'
+  call sample_fixedtime_config(params,idata_skip,ifilename)
+  print *,'.................... done'
+  !------------------------------
+  
+  
   
   
 end program main

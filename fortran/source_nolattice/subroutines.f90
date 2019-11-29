@@ -32,7 +32,7 @@ module subroutines
   integer::iversor(0:icoords,0:icoordination)
 
   ! maximum number of particles
-  integer,parameter::nmax=128
+  integer,parameter::nmax=256
 contains
   !================================================
   function ichoice(n)
@@ -294,16 +294,54 @@ contains
 
   end subroutine sample_fixedtime
   !================================================
+  subroutine  sample_fixedtime_config(params,idata_skip,filename)
+    !-------------------------------------------
+    !-------------------------------------------
+    real*8 ,intent(in)   ::params(iparams_size)
+    integer,intent(in)   ::idata_skip
+    character(len=*),intent(in)::filename
+    integer::icells(0:icoords,nmax)
+    icells = 0
+    n = int(params(n_))
+    call init_cells(n,icells)
+    idx = 1
+
+    open(unit=10,file=trim(filename)//"_config.dat")
+    
+    isteps = int(params(isteps_))
+    do istep = 1,isteps
+       call random_number(rng)
+       prob  = 0d0
+       iflag = 0
+       k  = 0
+       n0 = n ! dirty fix: make sure particles created within
+              ! updates are not updated 
+       do while ((iflag.eq.0).and.(k < n0)) 
+          k = k + 1 ! TODO:: shuffle indices to remove bias
+          call update_fixedtime(k,n,icells,params,rng,prob,iflag)
+       end do
+       
+       if (mod(istep,idata_skip).eq.0) then
+          idx = idx+1
+          write(10,*) istep,(icells(:,k),k=1,n)
+       end if
+    end do
+    close(10)
+  end subroutine sample_fixedtime_config
+  !================================================
   function is_free(iaux,icells,n)
     !-------------------------------------------
     ! returns 1 if iaux is in icells
+    !
+    ! NOTE:: overall elapsed time per call sits around 700ns
+    !        = chokepoint
     !-------------------------------------------
     integer,intent(in)::n,iaux(0:icoords),icells(0:icoords,n)
     integer::is_free
     real*8::terrible(n),beta
-    beta = 1d6
+    beta = 1d10
     terrible = [( sum((icells(1:icoords,j)-iaux(1:icoords))**2),j=1,n)]
-    terrible = exp(-beta*terrible)
+    terrible = (exp(-beta*terrible))
     ! terrible should be equal to 0 for most cases
     ! except when iaux is occupied in icells
     !
@@ -330,10 +368,9 @@ contains
        ky = k/L
        k1 = k+1
        icells(0,k1) = ichoice(icoordination+1)+inonpolarized
-       icells(1,k1) = kx*ispacing - ishift + mod(ky,2)*ihalfspacing
+       icells(1,k1) = kx*ispacing - ishift !+ mod(ky,2)*ihalfspacing
        icells(2,k1) = ky*ispacing - ishift
     end do
-    
     
     ! do k =1,n
     !    icells(0,k) = ichoice(icoordination+1)+inonpolarized
@@ -353,5 +390,6 @@ contains
     data(2) = sum(icells(1,:))
     data(3) = sum(icells(2,:))
     data(4) = sum(icells(1,:)**2+ icells(2,:)**2)
+
   end subroutine measurements
 end module subroutines
