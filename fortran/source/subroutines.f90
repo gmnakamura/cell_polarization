@@ -86,7 +86,7 @@ contains
        case ('-n','--N0')
           call get_command_argument(i+1,arg)
           read(arg,*) fargs(n_)
-          ifilename = trim(ifilename)//'_N0'//trim(arg)          
+          ifilename = trim(ifilename)//'_N'//trim(arg)          
        case ('--steps','-s')
           call get_command_argument(i+1,arg)
           read(arg,*) fargs(isteps_)
