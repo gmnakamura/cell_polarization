@@ -13,14 +13,18 @@ module subroutines
   integer,parameter::ipolarized_e3 = 4
   integer,parameter::ipolarized_e4 = 5
 
+  
+  integer,parameter::iparams_size = 9
   integer,parameter::Lx_=1
   integer,parameter::Ly_=2
-  integer,parameter::ihopping        = 5
-  integer,parameter::igapjunction    = 6
-  integer,parameter::idepolarization = 7
-  integer,parameter::ipolarization   = 8
-  
-  integer,parameter::iparams_size = 8
+  integer,parameter::n_ =3
+  integer,parameter::isteps_  =4
+  integer,parameter::isamples_=5
+  integer,parameter::ihopping_        = 6
+  integer,parameter::igapjunction_    = 7
+  integer,parameter::idepolarization_ = 8
+  integer,parameter::ipolarization_   = 9
+
   
   ! parameters related to measurements
   integer,parameter::idata_size_base = 4
@@ -63,7 +67,7 @@ contains
     ! Lx,Ly = 11 , steps = 100 , samples =100 ,
     ! hopping        = 1.0, gapjunction  = 0.5,
     ! depolarization = 0.0, polarization = 0.0
-    fargs = (/ 11d0, 11d0, 1d2 , 1d2 , 1d0, 5d-1 , 1d-1, 1d-1/)
+    fargs = (/ 11d0, 11d0, 1d0, 1d2 , 1d2 , 1d0, 5d-1 , 1d-1, 1d-1/)
     ! default data skip
     idata_skip_factor = 0
     
@@ -80,30 +84,34 @@ contains
        case ('-y','--Ly')
           call get_command_argument(i+1,arg)
           read(arg,*) fargs(Ly_)
-          ifilename = trim(ifilename)//'_y'//trim(arg)          
+          ifilename = trim(ifilename)//'_y'//trim(arg)
+       case ('-n','--N0')
+          call get_command_argument(i+1,arg)
+          read(arg,*) fargs(n_)
+          ifilename = trim(ifilename)//'_N'//trim(arg)
        case ('--steps','-s')
           call get_command_argument(i+1,arg)
-          read(arg,*) fargs(3)
+          read(arg,*) fargs(isteps_)
           ifilename = trim(ifilename)//'_steps'//trim(arg)
        case ('--samples','-mc')
           call get_command_argument(i+1,arg)
-          read(arg,*) fargs(4)
+          read(arg,*) fargs(isamples_)
           ifilename = trim(ifilename)//'_samples'//trim(arg)
        case ('--hopping','-o')          
           call get_command_argument(i+1,arg)
-          read(arg,*) fargs(ihopping)
+          read(arg,*) fargs(ihopping_)
           ifilename = trim(ifilename)//'_hop'//trim(arg)
        case ('--gap-junction','-g')          
           call get_command_argument(i+1,arg)
-          read(arg,*) fargs(igapjunction)
+          read(arg,*) fargs(igapjunction_)
           ifilename = trim(ifilename)//'_gap'//trim(arg)
        case ('--depolarization','-d')          
           call get_command_argument(i+1,arg)
-          read(arg,*) fargs(idepolarization)
+          read(arg,*) fargs(idepolarization_)
           ifilename = trim(ifilename)//'_depol'//trim(arg)
        case ('--polarization','-p')          
           call get_command_argument(i+1,arg)
-          read(arg,*) fargs(ipolarization)
+          read(arg,*) fargs(ipolarization_)
           ifilename = trim(ifilename)//'_pol'//trim(arg)
        case ('--skip')          
           call get_command_argument(i+1,arg)
@@ -125,20 +133,21 @@ contains
 
     !NOTE:
     ! polarization is divided by the coordination number
-    fargs(ipolarization)=fargs(ipolarization)/icoordination
+    fargs(ipolarization_)=fargs(ipolarization_)/icoordination
           
     print *,"************************"
     print *," "
     print *,"Starting parameters for hexagonal lattice :: "
-    print *,"Lx        = ",int(fargs(1))
-    print *,"Ly        = ",int(fargs(2))
-    print *,"isteps    = ",int(fargs(3))
-    print *,"isamples  = ",int(fargs(4))
+    print *,"Lx        = ",int(fargs(Lx_))
+    print *,"Ly        = ",int(fargs(Ly_))
+    print *,"N0        = ",int(fargs(n_))
+    print *,"isteps    = ",int(fargs(isteps_))
+    print *,"isamples  = ",int(fargs(isamples_))
     print *,""
-    print *,"hopping        rate = ",fargs(ihopping)
-    print *,"gap-junction   rate = ",fargs(igapjunction)
-    print *,"depolarization rate = ",fargs(idepolarization)
-    print *,"polarization   rate = ",fargs(ipolarization)
+    print *,"hopping        rate = ",fargs(ihopping_)
+    print *,"gap-junction   rate = ",fargs(igapjunction_)
+    print *,"depolarization rate = ",fargs(idepolarization_)
+    print *,"polarization   rate = ",fargs(ipolarization_)
     print *," "
     print *,"filename = ",trim(ifilename)
     print *,"************************"
@@ -202,12 +211,12 @@ contains
     ! if non-polarized, try to polarize it in a
     ! random direction
     if (icells(0,k).eq.inonpolarized) then
-       prob = prob +icoordination*dt*params(ipolarization)
+       prob = prob +icoordination*dt*params(ipolarization_)
        itmp = icheck(prob,rng) ! itmp =1 if rng < prob
        ! new direction chosen from uniform distribution
        ! [0,icoordination-1] + shift 
        icells(0,k) = (1-itmp)+ itmp*(ichoice(icoordination)+ipolarized_e1)
-       iflag = ipolarization*itmp
+       iflag = ipolarization_*itmp
        return
     end if
     !
@@ -215,11 +224,11 @@ contains
     !
 
     ! try to depolarize it
-    prob = prob + dt*params(idepolarization)
+    prob = prob + dt*params(idepolarization_)
     
     if (icheck(prob,rng).eq.1) then
        icells(0,k) = inonpolarized
-       iflag = idepolarization
+       iflag = idepolarization_
        return
     end if
 
@@ -235,8 +244,8 @@ contains
     !
     ! ignore the neighbouring problem for now (so it's not gapjunction)
     !
-    p = params(igapjunction)*params(ihopping)
-    q = (1d0 - params(igapjunction))*params(ihopping)
+    p = params(igapjunction_)*params(ihopping_)
+    q = (1d0 - params(igapjunction_))*params(ihopping_)
     !
     ! TODO::
     !
@@ -248,7 +257,7 @@ contains
     
     itmp = icheck(prob,rng)
     icells(:,k) = icells(:,k)+itmp*iversor(:,icurrent)
-    iflag = itmp*igapjunction    
+    iflag = itmp*igapjunction_    
   end subroutine update_fixedtime
   !================================================
   subroutine sample_fixedtime(params,idata_skip,data)    
@@ -259,18 +268,12 @@ contains
     real*8 ,intent(inout)::data(:,:)
     integer::icells(0:icoords,nmax)
     icells = 0
-    ! initial condition
-    n = int(params(Lx_))
-!    icells(0,1:n) = 2
+    n = int(params(n_))
     call init_cells(n,icells)
     idx = 1
-
-    ! do i=1,n
-    !    print *,int(i,1),'::',int(icells(:,i),1)
-    ! end do
     
     call measurements(n,icells,data(idx,:))
-    isteps = int(params(3))
+    isteps = int(params(isteps_))
     do istep = 1,isteps
        call random_number(rng)
        prob  = 0d0
@@ -289,11 +292,6 @@ contains
        end if
     end do
 
-    ! print *,'-------------------------'
-    ! do i=1,n
-    !    print *,int(i,1),'::',int(icells(:,i),1)
-    ! end do
-    
   end subroutine sample_fixedtime
   !================================================
   function is_free(iaux,icells,n)
@@ -316,30 +314,32 @@ contains
   !================================================
   subroutine init_cells(n,icells)
     !-------------------------------------------
-    ! initialize icells as follows
-    ! x_1 0   x_2  0   x_3 ...
-    !  0  x_5  0  x_6   0  ...
-    ! ...          0   x_n ...
+    ! initialize icells
     !-------------------------------------------
     integer,intent(in)   ::n
-    integer,intent(inout)::icells(0:icoords,n)
-    integer::isize,L,ix,iy
-    
+    integer,intent(inout)::icells(0:icoords,n)    
     icells = 0
-   ! L = int(sqrt(n*1d0))
-   ! do k = 1,n
-   !    icells(0,k) = ichoice(icoordination+1)+inonpolarized
-   !    iy = int((k - 1)/L)
-   !    icells(1,k) = 2*mod(k-1,L) + mod(iy,2)
-   !    icells(2,k) = 2*iy
-   ! end do
-
-   k0 = 0
-   do k =1,n
-       icells(0,k) = ichoice(icoordination+1)+inonpolarized
-       icells(1,k) = k0
-       k0=k0+2
-   end do
+    k0 = 0
+    L = int(sqrt(n*1d0))
+    ispacing = 4
+    ihalfspacing = max(ispacing/2,1)
+    ishift = int(L/2)*ispacing
+    
+    do k = 0,n-1
+       kx = mod(k,L)
+       ky = k/L
+       k1 = k+1
+       icells(0,k1) = ichoice(icoordination+1)+inonpolarized
+       icells(1,k1) = kx*ispacing - ishift + mod(ky,2)*ihalfspacing
+       icells(2,k1) = ky*ispacing - ishift
+    end do
+    
+    
+    ! do k =1,n
+    !    icells(0,k) = ichoice(icoordination+1)+inonpolarized
+    !    icells(1,k) = k0
+    !    k0=k0+2
+    ! end do
     
   end subroutine init_cells
   !================================================

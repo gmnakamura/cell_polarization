@@ -12,8 +12,8 @@ program main
 
   idata_skip = 0
   call read_args(params,ifilename,idata_skip)
-  isteps   = int(params(3))
-  isamples = int(params(4))
+  isteps   = int(params(isteps_))
+  isamples = int(params(isamples_))
   is_notzero = min(1,idata_skip)
   idata_skip = is_notzero*idata_skip+(1-is_notzero)
   ! data initialization
@@ -27,7 +27,7 @@ program main
 
   
   !$OMP PARALLEL DO private(datum,icells)
-  do isample = 1,isamples
+  do isample = 1,isamples     
      datum = 0d0
      call sample_fixedtime(params,idata_skip,datum)
      !$OMP CRITICAL

@@ -65,7 +65,7 @@ contains
     ! Lx,Ly,n = 11 , steps = 100 , samples =100 ,
     ! hopping        = 1.0, gapjunction  = 0.5,
     ! depolarization = 0.0, polarization = 0.0
-    fargs = (/ 11d0, 11d0, 11d0, 1d2 , 1d2 , 1d0, 5d-1 , 1d-1, 1d-1/)
+    fargs = (/ 11d0, 11d0, 1d0, 1d2 , 1d2 , 1d0, 5d-1 , 1d-1, 1d-1/)
     ! default data skip
     idata_skip_factor = 0
     
@@ -121,7 +121,7 @@ contains
           ifilename = trim(ifilename)//'_dataskip'//trim(arg)
        case('-h','--help')
           print *,'example usage'
-          print *,'main -x 10 -y 10 --samples 100 --steps 100 --gap-junction 0.5 --polarization 0.05 --depolarization 0.1 --skip 0'
+          print *,'main -x 10 -y 10 -n 4 --samples 100 --steps 100 --gap-junction 0.5 --polarization 0.05 --depolarization 0.1 --skip 0'
           print *,' '
           print *,'OBS: --skip 0 or any negative number forces collection of data at each time interval'
           call exit(0)
