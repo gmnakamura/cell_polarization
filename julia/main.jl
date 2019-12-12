@@ -17,7 +17,7 @@ using Random
 # NOTE:: add a function to collect command line parameters
 const _L = [32,32]
 const _steps   = 30000
-const _samples = 1
+const _samples = 100
 const _icoordination = 4
 _rates   = Dict()
 _rates["depolarization"]= 0.05e0
@@ -27,7 +27,7 @@ _rates["displacement"]  = 1e0
 #
 # DATA INIT
 #
-iskip=10
+iskip=100
 data = zeros(Float64,Int(_steps/iskip),2)
 L_tot = prod(_L)
 #
@@ -38,7 +38,6 @@ for sample=1:_samples
     cell,lattice = init(_L,n0);
     idata_idx = 0
     for step=0:_steps-1
-#        print(step,lattice[cell],'\n')
         N = size(cell)[1]
         # data collection
         if (mod(step,iskip) == 0)
