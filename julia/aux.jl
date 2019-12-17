@@ -73,7 +73,7 @@ function get_neighbours(k,L)
     neighs  = zeros(Int,2*idims+1)
     neighs[1]=kshift
     # forward neighs
-    for i=1:idims
+    for i=1:idims 
         ioutro = icoords[:]
         ioutro[i] = mod(icoords[i]+1+L[i],L[i])
         neighs[i+1] = get_index(ioutro,L) 

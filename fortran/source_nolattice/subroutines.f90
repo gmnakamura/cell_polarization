@@ -123,7 +123,7 @@ contains
           ifilename = trim(ifilename)//'_dataskip'//trim(arg)
        case('-h','--help')
           print *,'example usage'
-          print *,'main -x 10 -y 10 --samples 100 --steps 100 --gap-junction 0.5 --polarization 0.05 --depolarization 0.1 --skip 0'
+          print *,'main -x 10 -y 10 --n 256 --samples 100 --steps 100 --gap-junction 0.5 --polarization 0.05 --depolarization 0.1 --skip 0'
           print *,' '
           print *,'OBS: --skip 0 or any negative number forces collection of data at each time interval'
           call exit(0)

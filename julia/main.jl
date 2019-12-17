@@ -15,7 +15,7 @@ using Random
 
 
 # NOTE:: add a function to collect command line parameters
-const _L = [32,32]
+const _L = [64,64]
 const _steps   = 30000
 const _samples = 100
 const _icoordination = 4
@@ -27,19 +27,22 @@ _rates["displacement"]  = 1e0
 #
 # DATA INIT
 #
-iskip=100
+iskip=1
 data = zeros(Float64,Int(_steps/iskip),2)
 L_tot = prod(_L)
 #
 # MONTE CARLO SAMPLES
 #
 for sample=1:_samples
-    n0 = 64 #Int(prod(_L)*0.1)
+    n0 = 32 #Int(prod(_L)*0.1)
     cell,lattice = init(_L,n0);
     idata_idx = 0
     for step=0:_steps-1
         N = size(cell)[1]
+        #
         # data collection
+        #
+        
         if (mod(step,iskip) == 0)
             idata_idx += 1
             x = sum( lattice .== _nonpolarized)
@@ -47,8 +50,9 @@ for sample=1:_samples
             data[idata_idx,1] += (x)/_samples
             data[idata_idx,2] += (y)/_samples
         end
+        
         # shuffle the cell vector
-        shuffle!(cell);
+        # shuffle!(cell);
         # update
         iflag = 0
         k = 1
